@@ -1,19 +1,15 @@
-bash
-
-cat /home/claude/habit-island/.github/workflows/build-ios.yml
-Output
-
 name: Build iOS App
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   build-ios:
     runs-on: macos-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,7 +36,7 @@ jobs:
           cd ios/App
           pod install
 
-      - name: Build iOS (unsigned, for testing)
+      - name: Build iOS
         run: |
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
@@ -56,5 +52,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-build
-          path: build/ios/Build/Products/Release-iphonesimulator/App.app
-          retention-days: 7
+          path: build/ios/Build/Products/Release-iphonesi
