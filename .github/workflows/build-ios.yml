@@ -53,11 +53,9 @@ jobs:
 
       - name: Find build output
         run: find build/ios -name "*.app" 2>/dev/null || echo "No .app found"
-
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-build
-          path: build/ios/Build/Products/
+          path: build/ios/Build/Products/Release-iphonesimulator/App.app
           retention-days: 7
-          if-no-files-found: warn
