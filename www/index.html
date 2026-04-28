@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>習慣養成</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0d0b1e;--panel:#161430;--p2:#1e1b40;--bd:#2a2660;
+  --gold:#fbbf24;--green:#10b981;--red:#ef4444;--blue:#60a5fa;--purple:#a78bfa;
+  --text:#f0efff;--sub:#8b89b0;--r:16px;
+  --main:#6366f1;--main2:#4f46e5;
+}
+html{font-size:17px;}
+body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:430px;margin:0 auto;overflow-x:hidden;}
+
+/* ── LOADING ── */
+#loading{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.ld-emoji{font-size:5rem;animation:pulse 1.5s infinite alternate;}
+.ld-txt{font-size:1.2rem;font-weight:900;color:var(--gold);}
+@keyframes pulse{0%{transform:scale(1)}100%{transform:scale(1.15)}}
+
+/* ── STORY ONBOARDING ── */
+#storyScreen{position:fixed;inset:0;z-index:200;overflow:hidden;display:none;}
+#storyScreen.show{display:block;}
+.story-slides{display:flex;width:500vw;height:100%;transition:transform .4s cubic-bezier(.4,0,.2,1);}
+.slide{width:100vw;max-width:100vw;flex-shrink:0;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px 160px;text-align:center;position:relative;overflow:hidden;overflow-y:auto;}
+.s1{background:linear-gradient(160deg,#0d0b1e,#1e1040);}
+.s2{background:linear-gradient(160deg,#0d1a2e,#0d2e1e);}
+.s3{background:linear-gradient(160deg,#1a0d2e,#2e0d1e);}
+.s4{background:linear-gradient(160deg,#0d1e2e,#1e2e0d);}
