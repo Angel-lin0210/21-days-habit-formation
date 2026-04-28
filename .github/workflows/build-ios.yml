@@ -19,6 +19,9 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Setup www folder
+        run: mkdir -p www && cp index.html www/index.html
+
       - name: Install dependencies
         run: npm install
 
@@ -48,8 +51,13 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
+      - name: Find build output
+        run: find build/ios -name "*.app" 2>/dev/null || echo "No .app found"
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-build
-          path: build/ios/Build/Products/Release-iphonesi
+          path: build/ios/Build/Products/
+          retention-days: 7
+          if-no-files-found: warn
