@@ -1,0 +1,15 @@
+{
+  "name": "habit-island",
+  "version": "1.0.0",
+  "description": "習慣養成島 - Habit Island",
+  "main": "index.js",
+  "scripts": {
+    "build": "echo 'No build needed'",
+    "sync": "npx cap sync"
+  },
+  "dependencies": {
+    "@capacitor/core": "^5.0.0",
+    "@capacitor/ios": "^5.0.0",
+    "@capacitor/android": "^5.0.0"
+  }
+}
