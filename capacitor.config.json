@@ -1,25 +1,12 @@
 {
   "appId": "com.habitisland.app",
   "appName": "習慣養成島",
-  "webDir": ".",
-  "bundledWebRuntime": false,
-  "server": {
-    "androidScheme": "https"
-  },
+  "webDir": "www",
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 2000,
       "backgroundColor": "#0d0b1e",
-      "androidSplashResourceName": "splash",
-      "androidScaleType": "CENTER_CROP",
       "showSpinner": false
-    },
-    "StatusBar": {
-      "style": "DARK",
-      "backgroundColor": "#0d0b1e"
     }
-  },
-  "ios": {
-    "contentInset": "always"
   }
 }
