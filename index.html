@@ -1685,7 +1685,7 @@ function renderToday(){
   if(_ubNm)_ubNm.textContent=CU.name;
   const uid=VID||(CU.role==='child'?CU.id:null);
   const u=cu(uid);
-  const lv=getLevel(uid||CU.id);
+  const lv=getLv(uid||CU.id);
   document.getElementById('ubLv').textContent='Lv'+lv.lv+' '+lv.name;
   // Child switcher
   const csw=document.getElementById('childSwWrap');
@@ -1704,7 +1704,7 @@ function renderToday(){
   } else if(csw) csw.style.display='none';
   // XP bar (child only)
   if(u&&CU.role==='child'){
-    const avail=getAvail(u.id);const lv2=getLevel(u.id);
+    const avail=getAvail(u.id);const lv2=getLv(u.id);
     const xpFill=document.getElementById('xpFill');
     if(xpFill)xpFill.style.width=Math.min(100,(lv2.xp/lv2.max*100))+'%';
     const xpLbl=document.getElementById('xpLbl');
@@ -2202,11 +2202,14 @@ function renderProgress(){
     }
   } else if(pcSw) pcSw.style.display='none';
 
+  // Use dayWall container as wrapper, clear it
   const wall=document.getElementById('dayWall');if(!wall)return;
+  wall.className=''; // Remove day-wall grid class - we'll manage layout ourselves
+  wall.style.cssText='';
   wall.innerHTML='';
 
   if(!u.challengeStart){
-    wall.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--sub);font-size:.88rem;font-weight:700;">還沒開始挑戰</div>';
+    wall.innerHTML='<div style="text-align:center;padding:20px;color:var(--sub);font-size:.88rem;font-weight:700;">還沒開始挑戰</div>';
     return;
   }
 
@@ -2219,28 +2222,33 @@ function renderProgress(){
   const tasks=(admin&&admin.sharedSecondary)||[];
   const todayK=tk();
 
-  // If no tasks - show single calendar
   if(!tasks.length){
-    renderCalendar(wall, uid, sy, sm, sd, null, '📅 打卡紀錄', todayK);
+    // No tasks - show single overall calendar
+    const sec=document.createElement('div');sec.style.cssText='margin-bottom:20px;';
+    const hdr=document.createElement('div');hdr.style.cssText='font-size:.82rem;font-weight:900;color:#fff;margin-bottom:8px;padding:0 4px;';
+    hdr.textContent='📅 打卡紀錄';sec.appendChild(hdr);
+    const grid=document.createElement('div');grid.className='day-wall';
+    fillCalendar(grid,uid,sy,sm,sd,null,todayK);
+    sec.appendChild(grid);wall.appendChild(sec);
     return;
   }
 
-  // Each task gets its own calendar
+  // Each task gets its own calendar section
   tasks.forEach(function(task){
     const isMain=task.id===(admin&&admin.mainTaskId);
-    const section=document.createElement('div');
-    section.style.cssText='margin-bottom:20px;';
+    const taskDays=(logs[uid]||[]).filter(function(l){return l.secondaryDone&&l.secondaryDone[task.id];}).length;
+    const sec=document.createElement('div');sec.style.cssText='margin-bottom:20px;';
     const hdr=document.createElement('div');
-    hdr.style.cssText='font-size:.82rem;font-weight:900;color:'+(isMain?'var(--gold)':'#fff')+';margin-bottom:8px;padding:0 4px;';
-    hdr.textContent=(isMain?'⭐ ':'')+(task.e||'📌')+' '+task.name+(isMain?' (主任務)':'');
-    section.appendChild(hdr);
-    const grid=document.createElement('div');
-    grid.className='day-wall';
-    renderCalendar(grid, uid, sy, sm, sd, task.id, null, todayK);
-    section.appendChild(grid);
-    wall.appendChild(section);
+    hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 4px;';
+    hdr.innerHTML='<span style="font-size:.85rem;font-weight:900;color:'+(isMain?'var(--gold)':'#fff')+'">'+(isMain?'⭐ ':'')+task.name+(isMain?' (主任務)':'')+'</span>'
+      +'<span style="font-size:.78rem;font-weight:800;color:var(--sub);">完成 '+taskDays+' 天</span>';
+    sec.appendChild(hdr);
+    const grid=document.createElement('div');grid.className='day-wall';
+    fillCalendar(grid,uid,sy,sm,sd,task.id,todayK);
+    sec.appendChild(grid);wall.appendChild(sec);
   });
 }
+
 
 function renderCalendar(container, uid, sy, sm, sd, taskId, title, todayK){
   if(title){
