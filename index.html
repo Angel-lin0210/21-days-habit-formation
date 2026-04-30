@@ -3270,6 +3270,42 @@ function addSecTask2(uid){
   save();renderStMgList2(uid);renderSecondary(uid);
 }
 
+
+function renderMonster(uid){
+  const mw=document.getElementById('monsterWrap');if(!mw)return;
+  const u=cu(uid);
+  if(!u||!u.challengeStart){
+    mw.innerHTML='<div style="margin:0 14px 10px;background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:16px;text-align:center;"><div style="font-size:2rem;margin-bottom:8px;">🐉</div><div style="font-size:.88rem;font-weight:900;color:var(--sub);">還沒開始習慣挑戰</div></div>';
+    return;
+  }
+  const totalDmg=(logs[uid]||[]).reduce(function(a,l){return a+(l.dmg||0);},0);
+  const maxHp=100;const hp=Math.max(0,maxHp-totalDmg%maxHp);
+  const hpPct=Math.round(hp/maxHp*100);
+  const tlog=todayLog(uid);const attacked=tlog&&tlog.dmg>0;
+  const BOSSES=[{e:'🐛',name:'毛毛蟲'},{e:'🦎',name:'小蜥蜴'},{e:'🐍',name:'大蟒蛇'},{e:'🦖',name:'恐龍'},{e:'🐉',name:'巨龍'},{e:'👹',name:'魔王'}];
+  const days=get21(uid);const bossIdx=Math.min(Math.floor(days/4),BOSSES.length-1);
+  const boss=BOSSES[bossIdx];
+  mw.innerHTML='<div style="margin:0 14px 10px;"><div style="background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:14px;">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+    +'<div style="font-size:2.5rem;">'+boss.e+'</div>'
+    +'<div style="flex:1;"><div style="font-size:.88rem;font-weight:900;color:#fff;">'+boss.name+'</div>'
+    +'<div style="background:var(--bd);border-radius:6px;height:10px;margin-top:6px;overflow:hidden;">'
+    +'<div id="monsterHp" style="background:'+(hpPct>50?'var(--green)':hpPct>25?'var(--gold)':'var(--red)')+';height:10px;border-radius:6px;width:'+hpPct+'%;transition:width .5s;"></div>'
+    +'</div><div style="font-size:.72rem;color:var(--sub);margin-top:3px;">HP '+hp+'/'+maxHp+(attacked?' ✅ 今日已攻擊':'')+'</div>'
+    +'</div></div></div></div>';
+}
+
+function renderStreakRow(uid){
+  const row=document.getElementById('streakDayRow');if(!row)return;
+  if(!uid){row.innerHTML='';return;}
+  const u=cu(uid);if(!u||!u.challengeStart){row.innerHTML='';return;}
+  const streak=getStreak(uid);const days=get21(uid);
+  row.innerHTML='<div style="display:flex;gap:10px;justify-content:center;padding:6px 14px 2px;flex-wrap:wrap;">'
+    +'<div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:5px 14px;font-size:.82rem;font-weight:900;color:var(--gold);">🔥 連勝 '+streak+' 天</div>'
+    +'<div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:5px 14px;font-size:.82rem;font-weight:900;color:var(--purple);">📅 完成 '+days+'/21 天</div>'
+    +'</div>';
+}
+
 </script>
 </body>
 </html>
