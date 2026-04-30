@@ -1681,7 +1681,8 @@ function renderToday(){
   if(!CU)return;
   if(!VID&&isParent()){const kids=users.filter(u=>u.role==='child');if(kids.length)VID=kids[0].id;}
   document.getElementById('ubAv').textContent=CU.avatar;
-  document.getElementById('ubNm').textContent=CU.name;
+  const _ubNm=document.getElementById('ubNm')||document.getElementById('ubName');
+  if(_ubNm)_ubNm.textContent=CU.name;
   const uid=VID||(CU.role==='child'?CU.id:null);
   const u=cu(uid);
   const lv=getLevel(uid||CU.id);
@@ -1702,15 +1703,14 @@ function renderToday(){
     csw.innerHTML='';csw.appendChild(row);
   } else if(csw) csw.style.display='none';
   // XP bar (child only)
-  const xpWrap=document.getElementById('xpBarWrap');
-  if(xpWrap){
-    if(u&&CU.role==='child'){
-      const avail=getAvail(u.id);const lv2=getLevel(u.id);
-      xpWrap.style.display='block';
-      document.getElementById('xpFill').style.width=Math.min(100,(lv2.xp/lv2.max*100))+'%';
-      document.getElementById('xpLbl').textContent=lv2.xp+' / '+lv2.max;
-      document.getElementById('xpPts').textContent='可用：'+avail+' 點';
-    } else xpWrap.style.display='none';
+  if(u&&CU.role==='child'){
+    const avail=getAvail(u.id);const lv2=getLevel(u.id);
+    const xpFill=document.getElementById('xpFill');
+    if(xpFill)xpFill.style.width=Math.min(100,(lv2.xp/lv2.max*100))+'%';
+    const xpLbl=document.getElementById('xpLbl');
+    if(xpLbl)xpLbl.textContent=lv2.xp+' / '+lv2.max;
+    const xpPts=document.getElementById('xpPts');
+    if(xpPts)xpPts.textContent='可用：'+avail+' 點';
   }
   // Streak row
   renderStreakRow(uid);
@@ -2208,6 +2208,34 @@ function renderProgress(){
   const msInsight=document.getElementById('msInsightWrap');if(msInsight)msInsight.style.display='none';
   const msMgWrap=document.getElementById('msMgWrap');if(msMgWrap)msMgWrap.style.display='none';
 
+  // Per-task completion stats
+  const admin=getAdmin();
+  const tasks=(admin&&admin.sharedSecondary)||[];
+  if(tasks.length){
+    const statsDiv=document.createElement('div');
+    statsDiv.style.cssText='margin:0 14px 12px;';
+    statsDiv.innerHTML='<div style="font-size:.72rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">📊 各任務完成天數</div>';
+    tasks.forEach(function(task){
+      const isMain=task.id===(admin&&admin.mainTaskId);
+      const taskDays=(logs[uid]||[]).filter(function(l){
+        return l.secondaryDone&&l.secondaryDone[task.id];
+      }).length;
+      const bar=document.createElement('div');
+      bar.style.cssText='margin-bottom:6px;';
+      bar.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:3px;">'
+        +'<span style="font-size:.82rem;font-weight:800;color:'+(isMain?'var(--gold)':'#fff')+';">'+(isMain?'⭐ ':'')+task.name+'</span>'
+        +'<span style="font-size:.78rem;font-weight:900;color:var(--sub);">'+taskDays+' 天</span>'
+        +'</div>'
+        +'<div style="background:var(--bd);border-radius:4px;height:6px;">'
+        +'<div style="background:'+(isMain?'var(--gold)':'var(--main)')+';border-radius:4px;height:6px;width:'+Math.min(100,taskDays/21*100)+'%;transition:width .5s;"></div>'
+        +'</div>';
+      statsDiv.appendChild(bar);
+    });
+    const progressWall=document.getElementById('progressWall');
+    if(progressWall)progressWall.parentNode.insertBefore(statsDiv,progressWall);
+    else document.getElementById('pg-progress').appendChild(statsDiv);
+  }
+
   // Day wall - just the calendar
   const wall=document.getElementById('dayWall');if(!wall)return;
   wall.innerHTML='';
@@ -2305,17 +2333,29 @@ function renderRewards(){
     }
   }
 
-  // ── MILESTONE rewards ──
   const admin=getAdmin();
+  // ── PARENT: milestone setting ──
+  if(isParent()){
+    var msSetDiv=document.createElement('div');
+    msSetDiv.className='set-sec';
+    msSetDiv.innerHTML='<div class="set-lbl">🏅 里程碑獎勵設定</div>'
+      +'<div class="set-card"><div id="msMgCard2" style="padding:8px 0;"></div></div>';
+    content.appendChild(msSetDiv);
+    setTimeout(function(){
+      var el=document.getElementById('msMgCard2');
+      if(el)renderMsMgListIn(el,uid);
+    },10);
+  }
+  // ── ALL: milestone claim ──
   const ms_rewards=document.createElement('div');
   ms_rewards.style.cssText='padding:0 14px 8px;';
   ms_rewards.innerHTML='<div style="font-size:.82rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">🏅 里程碑獎勵</div>';
-  MILESTONES.forEach(ms=>{
+  MILESTONES.forEach(function(ms){
     const customMs=getMilestoneRewards(uid);
     const reward=customMs[ms.day]||ms;
-    const days=getStreak(uid);
-    const unlocked=days>=ms.day;
-    const claimed=u?.claimedMs?.[ms.day];
+    const streak=getStreak(uid);
+    const unlocked=streak>=ms.day;
+    const claimed=u&&u.claimedMs&&u.claimedMs[ms.day];
     const row=document.createElement('div');
     row.style.cssText='display:flex;align-items:center;gap:12px;background:var(--panel);border:1.5px solid '+(claimed?'var(--green)':unlocked?'var(--gold)':'var(--bd)')+';border-radius:12px;padding:12px 14px;margin-bottom:8px;';
     row.innerHTML='<div style="font-size:1.6rem;">'+(claimed?'✅':unlocked?reward.e:'🔒')+'</div>'
@@ -2327,7 +2367,7 @@ function renderRewards(){
       const btn=document.createElement('button');
       btn.style.cssText='background:var(--gold);color:#000;border:none;border-radius:8px;padding:7px 12px;font-family:Nunito,sans-serif;font-weight:900;font-size:.82rem;cursor:pointer;';
       btn.textContent='領取！';
-      btn.onclick=()=>claimMilestone(uid,ms.day);
+      btn.onclick=function(){claimMilestone(uid,ms.day);};
       row.appendChild(btn);
     }
     ms_rewards.appendChild(row);
@@ -2756,6 +2796,34 @@ function addInstantReward(uid){
   renderInstantRewardDisplay(uid);
   document.getElementById('irInp').value='';
   modal('✅','即時獎勵已新增！','','孩子今日頁面會看到「'+val+'」');
+}
+
+function renderMsMgListIn(el,uid){
+  // Render milestone setting into any element
+  if(!el)return;
+  el.innerHTML='';
+  MILESTONES.forEach(function(ms){
+    const admin=getAdmin();
+    const customMs=getMilestoneRewards(uid);
+    const reward=customMs[ms.day]||ms;
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--bd);';
+    row.innerHTML='<div style="font-size:1.2rem;">'+reward.e+'</div>'
+      +'<div style="flex:1;"><div style="font-size:.85rem;font-weight:900;color:#fff;">Day '+ms.day+' 里程碑</div>'
+      +'<div style="font-size:.75rem;color:var(--sub);">'+reward.name+'</div></div>';
+    var editBtn=document.createElement('button');
+    editBtn.style.cssText='background:var(--main);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-family:Nunito,sans-serif;font-weight:800;font-size:.75rem;cursor:pointer;';
+    editBtn.textContent='設定';
+    editBtn.onclick=function(){
+      var emoji=prompt('Day'+ms.day+' Emoji（例如🎮）：',reward.e)||reward.e;
+      var name=prompt('獎勵名稱：',reward.name)||reward.name;
+      var xp=parseInt(prompt('獎勵 XP（0 = 不給）：',reward.xp||0))||0;
+      if(!admin.milestoneRewards)admin.milestoneRewards={};
+      admin.milestoneRewards[ms.day]={e:emoji,name:name,xp:xp};
+      save();renderMsMgListIn(el,uid);
+    };
+    row.appendChild(editBtn);el.appendChild(row);
+  });
 }
 
 function renderMsMgList(){
