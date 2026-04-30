@@ -1634,7 +1634,7 @@ function confirmHabitSetup(){
   if(_selH.id==='h4'){const cv=document.getElementById('customHabitName')?.value.trim();if(cv)name=cv;}
   u.habitName=name;u.habitEmoji=emoji;
   u.checklist=JSON.parse(JSON.stringify(_editCL));
-  u.challengeStart=new Date().toISOString();
+  u.challengeStart=tk(); // Store as local date string to avoid timezone issues
   if(!logs[uid])logs[uid]=[];
   if(_addingHabit2){
     if(!u.habits2)u.habits2=[];
@@ -2076,9 +2076,10 @@ function renderProgress(){
     wall.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--sub);font-size:.88rem;font-weight:700;">還沒開始挑戰</div>';
     return;
   }
-  const start=new Date(u.challengeStart);
+  const startStr2=u.challengeStart.slice(0,10);
+  const [py,pm,pd]=startStr2.split('-').map(Number);
   for(let i=0;i<21;i++){
-    const d=new Date(start);d.setDate(d.getDate()+i);
+    const d=new Date(py,pm-1,pd+i);
     const k=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
     const todayK=tk();
     const log=(logs[uid]||[]).find(l=>l.date===k);
