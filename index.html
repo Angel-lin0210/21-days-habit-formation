@@ -1679,118 +1679,256 @@ function go(id){
 let _lastLvMap={};
 function renderToday(){
   if(!CU)return;
-  const asn=assigned();
-  // User bar
+  if(!VID&&isParent()){const kids=users.filter(u=>u.role==='child');if(kids.length)VID=kids[0].id;}
   document.getElementById('ubAv').textContent=CU.avatar;
-  document.getElementById('ubName').textContent=CU.name;
+  document.getElementById('ubNm').textContent=CU.name;
+  const uid=VID||(CU.role==='child'?CU.id:null);
+  const u=cu(uid);
+  const lv=getLevel(uid||CU.id);
+  document.getElementById('ubLv').textContent='Lv'+lv.lv+' '+lv.name;
   // Child switcher
-  const csw=document.getElementById('childSwWrap');csw.innerHTML='';
+  const csw=document.getElementById('childSwWrap');
+  const asn=assigned();
   if(isParent()&&asn.length>1){
     csw.style.display='block';
     const row=document.createElement('div');row.className='child-sw';
-    asn.forEach(ch=>{const b=document.createElement('button');b.className='csw-btn'+(ch.id===VID?' on':'');b.textContent=ch.avatar+' '+ch.name;b.onclick=()=>{VID=ch.id;renderToday();};row.appendChild(b);});
-    csw.appendChild(row);
-  } else csw.style.display='none';
-  // Auto-assign VID for parent
-  if(!VID&&isParent()){const kids=users.filter(u=>u.role==='child');if(kids.length)VID=kids[0].id;}
-  if(!VID){
-    document.getElementById('ubLv').textContent='';
-    document.getElementById('xpFill').style.width='0%';
-    document.getElementById('xpLbl').textContent='0 / 50';
-    document.getElementById('xpPts').textContent='可用：0 點';
-    document.getElementById('monsterWrap').innerHTML=`<div class="monster-wrap"><div class="no-challenge"><div class="nc-emoji">👨‍👩‍👧</div><div class="nc-txt">還沒有孩子帳號<br>請去設定頁新增！</div><button class="btn-big btn-primary" style="max-width:200px;margin:0 auto;" onclick="go('settings')">⚙️ 去設定</button></div></div>`;
-    document.getElementById('streakDayRow').innerHTML='';
+    asn.forEach(function(ch){
+      const b=document.createElement('button');
+      b.className='csw-btn'+(ch.id===VID?' on':'');
+      b.textContent=ch.avatar+' '+ch.name;
+      b.onclick=function(){VID=ch.id;renderToday();};
+      row.appendChild(b);
+    });
+    csw.innerHTML='';csw.appendChild(row);
+  } else if(csw) csw.style.display='none';
+  // XP bar (child only)
+  const xpWrap=document.getElementById('xpBarWrap');
+  if(xpWrap){
+    if(u&&CU.role==='child'){
+      const avail=getAvail(u.id);const lv2=getLevel(u.id);
+      xpWrap.style.display='block';
+      document.getElementById('xpFill').style.width=Math.min(100,(lv2.xp/lv2.max*100))+'%';
+      document.getElementById('xpLbl').textContent=lv2.xp+' / '+lv2.max;
+      document.getElementById('xpPts').textContent='可用：'+avail+' 點';
+    } else xpWrap.style.display='none';
+  }
+  // Streak row
+  renderStreakRow(uid);
+  // Monster
+  renderMonster(uid);
+  // PARENT: settings on top
+  if(isParent()){
     document.getElementById('attackWrap').innerHTML='';
     document.getElementById('clWrap').innerHTML='';
-    document.getElementById('ratingWrap').innerHTML='';
-    document.getElementById('msgWrap').innerHTML='';
+    document.getElementById('ratingWrap')&&(document.getElementById('ratingWrap').innerHTML='');
+    document.getElementById('msgWrap')&&(document.getElementById('msgWrap').innerHTML='');
+    renderParentTaskSettings(uid);
+    renderTaskList(uid);
     return;
   }
-  const uid=VID;const u=cu(uid);if(!u)return;
-  // XP & Level
-  const xp=getXP(uid);const lv=getLv(xp);const avail=getAvail(uid);
-  // Only show XP bar for child's view
-  const xpBarWrap=document.querySelector('.xp-bar-wrap');
-  if(xpBarWrap)xpBarWrap.style.display=CU.role==='child'?'block':'none';
-  document.getElementById('ubLv').textContent=CU.role==='child'?'Lv'+lv.lv+' '+lv.name:'';
-  const xpp=lv.lv>=5?100:Math.min(100,((xp-lv.min)/(lv.max-lv.min))*100);
-  const xpFillEl=document.getElementById('xpFill');
-  if(xpFillEl){
-    xpFillEl.style.width=xpp+'%';
-    // Craving: glow when near level up (>80%)
-    xpFillEl.style.animation=xpp>80&&lv.lv<5?'xpGlow 1.5s infinite':'none';
-  }
-  document.getElementById('xpLbl').textContent=xp+' / '+(lv.max===9999?'∞':lv.max);
-  document.getElementById('xpPts').textContent='可用：'+avail+' 點';
-  // Craving: show "還差X點升級" hint
-  if(lv.lv<5&&xpp>60){
-    const need=lv.max-xp;
-    document.getElementById('xpPts').textContent='可用：'+avail+' 點 · 再 '+need+' XP 就升級！';
-  }
-  // Level up check
-  const prevLv=_lastLvMap[uid]||0;
-  if(lv.lv>prevLv&&prevLv>0)lvUpAnim(lv.name);
-  _lastLvMap[uid]=lv.lv;
-  // Secondary tasks + task mgmt render before any returns
-
-  renderSecondary(uid);
-  renderTaskMgmt(uid);
+  // CHILD: tasks + attack
+  renderTaskList(uid);
   renderInstantRewardDisplay(uid);
   renderTodayMilestone(uid);
-  // Monster or no habit
-  const mw=document.getElementById('monsterWrap');
-  if(!u.challengeStart){
-    mw.innerHTML=`<div class="monster-wrap"><div class="no-challenge"><div class="nc-emoji">👾</div><div class="nc-txt">怪物在等你！<br>選一個習慣，開始21天挑戰！</div>${isParent()||CU.role==='child'?`<button class="btn-big btn-gold" style="max-width:220px;margin:0 auto;" onclick="setupHabitInit('${uid}');document.getElementById('mainNav').style.display='none';showScr('habitSetupScreen');">⚔️ 設定我的挑戰</button>`:''}</div></div>`;
-    document.getElementById('streakDayRow').innerHTML='';
-    document.getElementById('attackWrap').innerHTML='';
-    document.getElementById('clWrap').innerHTML='';
-    document.getElementById('ratingWrap').innerHTML='';
-    document.getElementById('msgWrap').innerHTML='';
-    return;
-  }
-  // Monster card
-  const tlog=todayLog(uid);
-  const streak=getStreak(uid);const days21=get21(uid);
-  const mon=MONSTERS[(new Date(u.challengeStart).getDate())%MONSTERS.length];
-  // HP: if attacked today, show reduced HP. If completed (killed), show 0.
-  const hpVal=tlog?.dmg?Math.max(0,10-(tlog.dmg||0)):10;
-  const hpPct=hpVal/10*100;
-  mw.innerHTML=`<div class="monster-wrap"><div class="monster-card"><div class="mc-glow"></div><span class="mon-emoji" id="monEmo">${mon}</span><div class="mon-name">${u.habitEmoji||'⭐'} ${u.habitName||'習慣'}怪（Day ${Math.min(21,days21+(tlog?.completed?0:1))}）</div><div class="hp-track"><div class="hp-fill" id="hpFill" style="width:${hpPct}%"></div></div><div class="hp-labels"><span>❤️ HP</span><span id="hpVal">${hpVal}/10</span></div><div class="mon-hint">⏰ 越快完成，<span>傷害越高</span>！</div>
-</div></div>`;
-  // Streak + Day + Points + Milestone countdown (Craving)
-  const nextMs=MILESTONES.find(m=>m.day>days21);
-  const msTxt=nextMs?`再${nextMs.day-days21}天→${nextMs.e}`:'🏅 已達成！';
-  document.getElementById('streakDayRow').innerHTML=`<div class="sd-badge streak"><div class="sdb-num">🔥 ${streak}</div><div class="sdb-lbl">天連勝</div></div><div class="sd-badge day"><div class="sdb-num">📅 ${days21}</div><div class="sdb-lbl">/21 天</div></div><div class="sd-badge" style="flex:1.3;"><div class="sdb-num" style="font-size:.9rem;color:var(--purple);">${msTxt}</div><div class="sdb-lbl">里程碑</div></div>`;
-  // Attack button - CHILD controls this
-  const aw=document.getElementById('attackWrap');
-  if(tlog?.completed){
-    aw.innerHTML=`<div class="attack-wrap"><button class="attack-btn done" disabled>✅ 今天已打卡！繼續保持！</button></div>`;
-  } else if(CU.role==='child'){
-    // Cue: show pulsing button to child
-    aw.innerHTML=`<div class="attack-wrap"><button class="attack-btn" id="attackPulseBtn" onclick="openBs()" style="animation:attackPulse 2s infinite;">⚔️ 我做到了！攻擊怪物！</button></div>`;
-  } else if(isParent()){
-    // Parent only sees status - cannot attack
-    const statusTxt=tlog?.dmg>0?`✅ ${u.name} 今天已打卡！`:`⏳ 等待 ${u.name} 自己打卡…`;
-    const statusColor=tlog?.dmg>0?'var(--green)':'var(--sub)';
-    aw.innerHTML=`<div class="attack-wrap"><div style="background:var(--p2);border:1.5px solid var(--bd);border-radius:14px;padding:14px;text-align:center;"><div style="font-size:.92rem;font-weight:900;color:${statusColor};">${statusTxt}</div><div style="font-size:.75rem;font-weight:700;color:var(--sub);margin-top:4px;">孩子自己打卡，家長給評分和留言</div></div></div>`;
-  } else {
-    aw.innerHTML=`<div class="attack-wrap"><button class="attack-btn locked" disabled>等待打卡…</button></div>`;
-  }
-  // Habit tabs
-  renderHabitTabs(uid);
-  renderUnlockBanner(uid);
-  // Checklist
-  renderCL(uid);
-  // Secondary tasks
-  // Task management (parent only)
-  renderTaskMgmt(uid);
-  // Message
-  // Rating
-  // Milestone check
-  // Milestone popup handled in doAttack - not here
 }
 
-// ── ATTACK ──
+function renderStreakRow(uid){
+  const row=document.getElementById('streakDayRow');if(!row)return;
+  if(!uid){row.innerHTML='';return;}
+  const streak=getStreak(uid);const days=get21(uid);
+  const u=cu(uid);if(!u||!u.challengeStart){row.innerHTML='';return;}
+  row.innerHTML='<div style="display:flex;gap:10px;justify-content:center;padding:6px 14px 2px;flex-wrap:wrap;">'
+    +'<div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:5px 14px;font-size:.82rem;font-weight:900;color:var(--gold);">🔥 連勝 '+streak+' 天</div>'
+    +'<div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:5px 14px;font-size:.82rem;font-weight:900;color:var(--purple);">📅 完成 '+days+'/21 天</div>'
+    +'</div>';
+}
+
+function renderParentTaskSettings(uid){
+  const wrap=document.getElementById('taskMgmtWrap');if(!wrap)return;
+  const admin=getAdmin();if(!admin)return;
+  const u=cu(uid);const childName=u?u.name:'孩子';
+  var outer=document.createElement('div');outer.style.cssText='margin:0 14px 10px;';
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+  hdr.innerHTML='<div style="font-size:.88rem;font-weight:900;color:#fff;">⚙️ 任務設定</div>'
+    +'<div style="font-size:.75rem;font-weight:800;color:var(--purple);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);border-radius:18px;padding:3px 10px;">針對：'+childName+'</div>';
+  outer.appendChild(hdr);
+  // Task card
+  var taskCard=document.createElement('div');
+  taskCard.style.cssText='background:var(--panel);border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin-bottom:8px;';
+  var taskHd=document.createElement('div');
+  taskHd.style.cssText='padding:9px 14px;font-size:.78rem;font-weight:900;color:var(--sub);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;';
+  taskHd.innerHTML='<span>📋 任務清單（最多5個）</span><span style="font-size:.68rem;color:var(--gold);">⭐ = 主任務（里程碑）</span>';
+  taskCard.appendChild(taskHd);
+  var taskList=document.createElement('div');taskList.id='parentTaskList';taskCard.appendChild(taskList);
+  var addRow=document.createElement('div');
+  addRow.style.cssText='padding:7px 14px;border-top:1px solid var(--bd);display:flex;gap:6px;align-items:center;';
+  var taskInp=document.createElement('input');taskInp.id='newTaskInp';taskInp.className='ai';
+  taskInp.placeholder='新增任務名稱';taskInp.style.cssText='flex:1;margin-bottom:0;font-size:.85rem;';
+  var ptsInp=document.createElement('input');ptsInp.id='newTaskPts';ptsInp.className='ai';
+  ptsInp.type='number';ptsInp.placeholder='點';ptsInp.style.cssText='width:46px;margin-bottom:0;font-size:.85rem;';
+  var addBtn=document.createElement('button');addBtn.textContent='+';
+  addBtn.style.cssText='background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-family:Nunito,sans-serif;font-weight:900;cursor:pointer;';
+  addBtn.onclick=function(){addTask(uid);};
+  addRow.appendChild(taskInp);addRow.appendChild(ptsInp);addRow.appendChild(addBtn);
+  taskCard.appendChild(addRow);outer.appendChild(taskCard);
+  // Milestone card
+  var msCard=document.createElement('div');
+  msCard.style.cssText='background:var(--panel);border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin-bottom:8px;';
+  var msHd=document.createElement('div');
+  msHd.style.cssText='padding:9px 14px;font-size:.78rem;font-weight:900;color:var(--sub);border-bottom:1px solid var(--bd);';
+  msHd.textContent='🏅 里程碑獎勵（主任務連續達成）';msCard.appendChild(msHd);
+  var msCont=document.createElement('div');msCont.id='msMgCard';msCard.appendChild(msCont);
+  outer.appendChild(msCard);
+  wrap.innerHTML='';wrap.appendChild(outer);
+  renderParentTaskList(uid);
+  setTimeout(function(){renderMsMgList();},10);
+}
+
+function renderParentTaskList(uid){
+  var el=document.getElementById('parentTaskList');if(!el)return;
+  var admin=getAdmin();
+  var tasks=(admin&&admin.sharedSecondary)||[];
+  var mainTaskId=admin&&admin.mainTaskId;
+  el.innerHTML='';
+  if(!tasks.length){el.innerHTML='<div style="padding:10px 14px;font-size:.82rem;color:var(--sub);">還沒有任務，新增最多5個</div>';return;}
+  tasks.forEach(function(task,i){
+    var isMain=task.id===mainTaskId;
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--bd);';
+    var starBtn=document.createElement('button');
+    starBtn.style.cssText='background:none;border:none;font-size:1.1rem;cursor:pointer;padding:2px;';
+    starBtn.textContent=isMain?'⭐':'☆';starBtn.title='設為主任務';
+    starBtn.onclick=function(){if(admin)admin.mainTaskId=task.id;save();renderParentTaskList(uid);renderTaskList(uid);};
+    var nameEl=document.createElement('span');
+    nameEl.style.cssText='flex:1;font-size:.88rem;font-weight:'+(isMain?'900':'700')+';color:'+(isMain?'var(--gold)':'#fff')+';';
+    nameEl.textContent=(task.e||'📌')+' '+task.name+(isMain?' ★':'');
+    var ptsEl=document.createElement('span');
+    ptsEl.style.cssText='font-size:.75rem;color:var(--gold);margin-right:4px;';
+    ptsEl.textContent='+'+task.p+'點';
+    var del=document.createElement('button');
+    del.style.cssText='background:none;border:none;color:var(--sub);cursor:pointer;';del.textContent='✕';
+    del.onclick=function(){admin.sharedSecondary.splice(i,1);if(admin.mainTaskId===task.id)admin.mainTaskId=null;save();renderParentTaskList(uid);renderTaskList(uid);};
+    row.appendChild(starBtn);row.appendChild(nameEl);row.appendChild(ptsEl);row.appendChild(del);el.appendChild(row);
+  });
+}
+
+function addTask(uid){
+  var admin=getAdmin();if(!admin)return;
+  var nameEl=document.getElementById('newTaskInp');var ptsEl=document.getElementById('newTaskPts');
+  if(!nameEl||!nameEl.value.trim())return;
+  if(!admin.sharedSecondary)admin.sharedSecondary=[];
+  if(admin.sharedSecondary.length>=5){modal('⚠️','最多5個任務','','請先刪除一個再新增！');return;}
+  var name=nameEl.value.trim();var p=parseInt(ptsEl&&ptsEl.value)||1;
+  admin.sharedSecondary.push({id:'st'+Date.now(),e:'📌',name:name,p:p});
+  if(!admin.mainTaskId&&admin.sharedSecondary.length===1)admin.mainTaskId=admin.sharedSecondary[0].id;
+  nameEl.value='';if(ptsEl)ptsEl.value='';
+  save();renderParentTaskList(uid);renderTaskList(uid);
+}
+
+function renderTaskList(uid){
+  var wrap=document.getElementById('secondaryWrap');if(!wrap)return;
+  var admin=getAdmin();
+  var tasks=getSecondaryTasks(uid);
+  var tlog=todayLog(uid);
+  var done=(tlog&&tlog.secondaryDone)||{};
+  var doneCount=tasks.filter(function(t){return done[t.id];}).length;
+  var mainTaskId=admin&&admin.mainTaskId;
+  var total=tasks.length;
+  if(!tasks.length){wrap.innerHTML='';return;}
+  var dmgLabel='';
+  if(doneCount>=4||doneCount===total&&total>0)dmgLabel='⚔️ 打死怪物！今日獎勵解鎖！';
+  else if(doneCount>=3)dmgLabel='💥 打掉一半血量！';
+  else if(doneCount>0)dmgLabel='💢 輕微傷害...';
+  var html='<div style="margin:0 14px 10px;">';
+  if(dmgLabel)html+='<div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:8px 12px;font-size:.82rem;font-weight:900;color:var(--green);margin-bottom:8px;text-align:center;">'+dmgLabel+'</div>';
+  html+='<div style="font-size:.72rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">任務清單（'+doneCount+'/'+total+'）</div>';
+  tasks.forEach(function(task){
+    var isDone=!!done[task.id];
+    var isMain=task.id===mainTaskId;
+    var clickable=CU&&CU.role==='child';
+    var borderColor=isDone?'var(--green)':isMain?'var(--gold)':'var(--bd)';
+    var nameColor=isDone?'var(--sub)':isMain?'var(--gold)':'#fff';
+    var fw=isMain?'900':'800';
+    html+='<div style="display:flex;align-items:center;gap:10px;background:var(--panel);border:1.5px solid '+borderColor+';border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:'+(clickable?'pointer':'default')+';" '+(clickable?'onclick="toggleTask(\''+uid+'\',\''+task.id+'\')"':'')+'>'+
+      '<div style="width:22px;height:22px;border-radius:6px;border:2px solid '+(isDone?'var(--green)':'var(--bd)')+';background:'+(isDone?'var(--green)':'transparent')+';display:flex;align-items:center;justify-content:center;font-size:.8rem;color:#fff;flex-shrink:0;">'+(isDone?'✓':'')+'</div>'+
+      '<div style="flex:1;font-size:.88rem;font-weight:'+fw+';color:'+nameColor+';'+(isDone?'text-decoration:line-through;':'')+'">'+
+      (isMain?'⭐ ':'')+task.name+'</div>'+
+      '<div style="font-size:.75rem;font-weight:900;color:'+(isDone?'var(--green)':'var(--sub)')+';">+'+task.p+'點</div>'+
+      '</div>';
+  });
+  html+='</div>';
+  wrap.innerHTML=html;
+  updateAttackButton(uid,doneCount,total);
+}
+
+function updateAttackButton(uid,doneCount,total){
+  var atk=document.getElementById('attackWrap');if(!atk)return;
+  if(CU&&CU.role!=='child'){atk.innerHTML='';return;}
+  var tlog=todayLog(uid);
+  if(tlog&&tlog.dmg>0){
+    atk.innerHTML='<div style="text-align:center;padding:10px;font-size:.88rem;font-weight:900;color:var(--green);">✅ 今日已攻擊！</div>';
+    return;
+  }
+  if(doneCount===0){atk.innerHTML='';return;}
+  var canKill=(doneCount>=4)||(total>0&&doneCount===total);
+  var label=canKill?'⚔️ 打死怪物！':'🗡️ 攻擊！（完成'+doneCount+'/'+total+'）';
+  var bg=canKill?'var(--green)':'var(--main)';
+  atk.innerHTML='<div style="padding:0 14px 10px;"><button class="btn-big" style="background:'+bg+';width:100%;border:none;" onclick="doNewAttack(\''+uid+'\')">'+label+'</button></div>';
+}
+
+function toggleTask(uid,taskId){
+  if(!logs[uid])logs[uid]=[];
+  var log=logs[uid].find(function(l){return l.date===tk();});
+  if(!log){log={date:tk(),type:-1,dmg:0,xp:0,completed:false,secondaryDone:{}};logs[uid].push(log);}
+  if(!log.secondaryDone)log.secondaryDone={};
+  var wasOn=!!log.secondaryDone[taskId];
+  log.secondaryDone[taskId]=!wasOn;
+  var task=getSecondaryTasks(uid).find(function(t){return t.id===taskId;});
+  if(!wasOn&&task){log.xp=(log.xp||0)+task.p;fp(task.p);}
+  else if(task)log.xp=Math.max(0,(log.xp||0)-task.p);
+  save();renderTaskList(uid);
+}
+
+function doNewAttack(uid){
+  var tasks=getSecondaryTasks(uid);
+  var tlog=todayLog(uid)||{secondaryDone:{}};
+  var done=tlog.secondaryDone||{};
+  var doneCount=tasks.filter(function(t){return done[t.id];}).length;
+  var total=tasks.length;
+  if(!logs[uid])logs[uid]=[];
+  var log=logs[uid].find(function(l){return l.date===tk();});
+  if(!log){log={date:tk(),type:-1,dmg:0,xp:0,completed:false,secondaryDone:{}};logs[uid].push(log);}
+  var dmg=0,completed=false,msg='',xpBonus=0;
+  var canKill=(doneCount>=4)||(total>0&&doneCount===total);
+  if(canKill){dmg=10;completed=true;xpBonus=5;msg='怪物被打死了！今日獎勵解鎖！';}
+  else if(doneCount>=3){dmg=5;completed=false;xpBonus=2;msg='打掉一半血量！明天繼續加油！';}
+  else{dmg=2;completed=false;xpBonus=0;msg='輕微傷害...再努力一點！';}
+  log.dmg=(log.dmg||0)+dmg;
+  log.xp=(log.xp||0)+xpBonus;
+  log.completed=completed;
+  log.type=canKill?0:doneCount>=3?1:2;
+  save();
+  setTimeout(function(){
+    if(completed){confetti();showIrPopup(uid);modal('🎉','怪物被打死了！','+'+xpBonus+' XP',msg);}
+    else{modal(doneCount>=3?'💥':'💢','攻擊！',xpBonus>0?'+'+xpBonus+' XP':'',msg);}
+  },200);
+  // Check milestone (main task streak)
+  var admin=getAdmin();
+  var mainTaskId=admin&&admin.mainTaskId;
+  if(mainTaskId&&done[mainTaskId]){
+    var streak=getStreak(uid);
+    var ms=MILESTONES.find(function(m){return m.day===streak;});
+    var cu2=cu(uid);
+    if(ms&&cu2&&!(cu2.claimedMs&&cu2.claimedMs[ms.day])){
+      setTimeout(function(){confetti();modal('🏅','里程碑達成！',ms.e+' Day'+ms.day,'主任務連續'+ms.day+'天！去獎勵頁領取！');},1500);
+    }
+  }
+  renderToday();
+}
+
+
+
 function openBs(){document.getElementById('bsOv').classList.add('show');document.getElementById('bsSheet').style.display='block';}
 function closeBs(){document.getElementById('bsOv').classList.remove('show');document.getElementById('bsSheet').style.display='none';}
 
