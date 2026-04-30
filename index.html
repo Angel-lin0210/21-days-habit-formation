@@ -1345,6 +1345,7 @@ async function load(){
       instantReward:u.instant_reward||'',
       sharedChecklist:u.shared_checklist||null,
       sharedSecondary:u.shared_secondary||null,
+      mainTaskId:u.main_task_id||null,
       disabledTasks:u.disabled_tasks||[],
       secondaryTasks:u.secondary_tasks||null
     }));
@@ -2102,35 +2103,62 @@ function renderProgress(){
 
 
 function renderRewards(){
-  const uid=VID;if(!uid)return;const u=cu(uid);
-  const days21=get21(uid);const avail=getAvail(uid);
-  document.getElementById('rwPts').textContent=avail;
+  // Auto-assign VID
+  if(!VID&&isParent()){const kids=users.filter(u=>u.role==='child');if(kids.length)VID=kids[0].id;}
+  const uid=VID||(CU&&CU.role==='child'?CU.id:null);
+  if(!uid)return;
+  const u=cu(uid);
+  const avail=getAvail(uid);
   const pr=pendingRedeems[uid]||[];
-  const rwChildName=cu(uid)?.name||'';
-  document.getElementById('rhSub').textContent=isParent()?'👁 '+rwChildName+'的獎勵':rwChildName+'，集點換獎勵！';
-  // Show gift points button for parent
-  const giftPtsEl=document.getElementById('giftPtsBtn');
-  if(giftPtsEl)giftPtsEl.style.display=isParent()?'flex':'none';
-  const content=document.getElementById('rewardsContent');content.innerHTML='';updatePB();
 
-  // Pending approvals (parent) - show ALL children's pending
+  document.getElementById('rwPts').textContent=avail;
+  const rwChildName=u?.name||'';
+  const rwNm=document.getElementById('rwChildName');if(rwNm)rwNm.textContent=isParent()?rwChildName:'';
+
+  const content=document.getElementById('rewardsContent');
+  if(!content)return;
+  content.innerHTML='';
+
+  // ── PARENT: settings on top ──
+  if(isParent()){
+    // Today's reward setting
+    content.innerHTML+=`<div class="set-sec"><div class="set-lbl">⚡ 今日獎勵設定</div>
+      <div class="set-card" style="padding:14px;">
+        <div style="font-size:.82rem;font-weight:700;color:rgba(255,255,255,.7);margin-bottom:10px;">完成4個以上任務後解鎖的當日獎勵</div>
+        <div id="irMgList2" style="margin-bottom:8px;"></div>
+        <div style="display:flex;gap:6px;">
+          <input id="irMgInp2" class="ai" placeholder="🍬 今天可以吃一顆糖" style="flex:1;margin-bottom:0;">
+          <button onclick="addIrTask2()" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-family:Nunito,sans-serif;font-weight:900;cursor:pointer;">+</button>
+        </div>
+      </div></div>`;
+
+    // Reward shop setting  
+    content.innerHTML+=`<div class="set-sec"><div class="set-lbl">🎁 商品獎勵設定</div>
+      <div class="set-card"><div class="add-form">
+        <div class="arow">
+          <input class="ai sm" id="siE" placeholder="🎁" maxlength="4">
+          <input class="ai" id="siN" placeholder="獎勵名稱" maxlength="16">
+          <input class="ai sm" id="siP" type="number" placeholder="點數" min="1">
+        </div>
+        <button class="add-btn" onclick="addReward()" style="width:100%;padding:11px;">新增商品獎勵</button>
+      </div>
+      <div id="rewardMgList"></div></div></div>`;
+
+    setTimeout(()=>{renderIrMgList2();renderRewardMgList();},10);
+  }
+
+  // ── ALL: pending approvals (parent sees all kids) ──
   if(isParent()){
     const allKids=users.filter(u=>u.role==='child');
     let allPending=[];
-    allKids.forEach(kid=>{
-      (pendingRedeems[kid.id]||[]).forEach((r,i)=>{
-        allPending.push({kid,r,i});
-      });
-    });
+    allKids.forEach(kid=>{(pendingRedeems[kid.id]||[]).forEach((r,i)=>{allPending.push({kid,r,i});});});
     if(allPending.length){
       let html='<div style="padding:14px 14px 0;"><div class="ps-title">⏳ 待審核申請</div>';
       allPending.forEach(({kid,r,i})=>{
         html+=`<div class="pending-item">
           <div style="font-size:1.5rem;">${r.e}</div>
-          <div style="flex:1;">
-            <div style="font-size:.9rem;font-weight:900;color:#fff;">${r.n}</div>
-            <div style="font-size:.78rem;color:var(--sub);">${kid.avatar} ${kid.name}・${r.p||0} 點</div>
-          </div>
+          <div style="flex:1;"><div style="font-size:.9rem;font-weight:900;color:#fff;">${r.n}</div>
+          <div style="font-size:.78rem;color:var(--sub);">${kid.avatar} ${kid.name}・${r.p||0} 點</div></div>
           <button style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.82rem;cursor:pointer;margin-right:5px;" onclick="aprRedeem('${kid.id}',${i})">✓ 批准</button>
           <button style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:var(--red);border-radius:8px;padding:7px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.82rem;cursor:pointer;" onclick="rejRedeem('${kid.id}',${i})">✕</button>
         </div>`;
@@ -2139,70 +2167,115 @@ function renderRewards(){
     }
   }
 
-  // === 獎勵商店 (全部可見) ===
-  const admin2=getAdmin();
-  const items=((admin2?.rewards?.length?admin2.rewards:null)||( u?.rewards?.length?u.rewards:null)||DEF_REWARDS).sort((a,b)=>(a.p||0)-(b.p||0));
+  // ── MILESTONE rewards ──
+  const admin=getAdmin();
+  const ms_rewards=document.createElement('div');
+  ms_rewards.style.cssText='padding:0 14px 8px;';
+  ms_rewards.innerHTML='<div style="font-size:.82rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">🏅 里程碑獎勵</div>';
+  MILESTONES.forEach(ms=>{
+    const customMs=getMilestoneRewards(uid);
+    const reward=customMs[ms.day]||ms;
+    const days=getStreak(uid);
+    const unlocked=days>=ms.day;
+    const claimed=u?.claimedMs?.[ms.day];
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:12px;background:var(--panel);border:1.5px solid '+(claimed?'var(--green)':unlocked?'var(--gold)':'var(--bd)')+';border-radius:12px;padding:12px 14px;margin-bottom:8px;';
+    row.innerHTML='<div style="font-size:1.6rem;">'+(claimed?'✅':unlocked?reward.e:'🔒')+'</div>'
+      +'<div style="flex:1;">'
+      +'<div style="font-size:.88rem;font-weight:900;color:'+(unlocked?'#fff':'var(--sub)')+';">Day '+ms.day+' 里程碑</div>'
+      +'<div style="font-size:.78rem;color:'+(unlocked?'var(--gold)':'var(--sub)')+';">'+(claimed?'已領取':unlocked?reward.name+'（點我領取！）':'主任務連續'+ms.day+'天後解鎖')+'</div>'
+      +'</div>';
+    if(unlocked&&!claimed){
+      const btn=document.createElement('button');
+      btn.style.cssText='background:var(--gold);color:#000;border:none;border-radius:8px;padding:7px 12px;font-family:Nunito,sans-serif;font-weight:900;font-size:.82rem;cursor:pointer;';
+      btn.textContent='領取！';
+      btn.onclick=()=>claimMilestone(uid,ms.day);
+      row.appendChild(btn);
+    }
+    ms_rewards.appendChild(row);
+  });
+  content.appendChild(ms_rewards);
+
+  // ── SHOP ──
+  const items=((admin?.rewards?.length?admin.rewards:null)||(u?.rewards?.length?u.rewards:null)||DEF_REWARDS).sort((a,b)=>(a.p||0)-(b.p||0));
   let shopHtml='<div style="padding:0 14px 8px;">'
     +'<div style="font-size:.82rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">🎁 獎勵商店</div>';
-
   items.forEach(item=>{
     const can=avail>=(item.p||0);
     const pend=pr.some(r=>r.id===item.id);
     let btn;
-    if(isParent()){
-      btn='<div style="font-size:.75rem;font-weight:800;color:var(--sub);padding:4px 8px;">等待申請</div>';
-    } else if(pend){
-      btn='<button class="ri-btn ri-pend">申請中…</button>';
-    } else if(can){
-      btn=`<button class="ri-btn ri-can" onclick="reqRedeem('${uid}','${item.id}')">兌換！</button>`;
-    } else {
-      btn=`<button class="ri-btn ri-cant">還差${(item.p||0)-avail}點</button>`;
-    }
-    // Add delete for parent
-    const delBtnHtml=isParent()?'<button onclick="delRewardItem(\''+item.id+'\')" style="background:none;border:none;color:var(--sub);font-size:1rem;cursor:pointer;padding:4px 6px;margin-left:4px;">✕</button>':'';
+    if(isParent()){btn='<div style="font-size:.75rem;font-weight:800;color:var(--sub);padding:4px 8px;">等待申請</div>';}
+    else if(pend){btn='<button class="ri-btn ri-pend">申請中…</button>';}
+    else if(can){btn=`<button class="ri-btn ri-can" onclick="reqRedeem('${uid}','${item.id}')">兌換！</button>`;}
+    else{btn=`<button class="ri-btn ri-cant">還差${(item.p||0)-avail}點</button>`;}
+    const delBtn=isParent()?`<button onclick="delRewardItem('${item.id}')" style="background:none;border:none;color:var(--sub);font-size:1rem;cursor:pointer;padding:4px 6px;">✕</button>`:'';
     shopHtml+=`<div class="reward-item" style="margin-bottom:8px;">
       <div class="ri-ico">${item.e}</div>
-      <div class="ri-info">
-        <div class="ri-name">${item.n}</div>
-        <div class="ri-cost">⭐ ${item.p||0} 點</div>
-      </div>${btn}${delBtnHtml}
-    </div>`;
+      <div class="ri-info"><div class="ri-name">${item.n}</div><div class="ri-cost">⭐ ${item.p||0} 點</div></div>
+      ${btn}${delBtn}</div>`;
   });
   shopHtml+='</div>';
   content.innerHTML+=shopHtml;
 
-  // History
+  // ── HISTORY ──
   const hist=redeemHist[uid]||[];
   if(hist.length){
     let hh='<div style="padding:0 14px 14px;"><div class="ps-title">📜 兌換紀錄</div>';
     [...hist].reverse().slice(0,10).forEach(r=>{
-      hh+=`<div class="hist-item">
-        <div style="font-size:1.3rem;">${r.e}</div>
-        <div style="flex:1;"><div style="font-size:.88rem;font-weight:800;color:#fff;">${r.n}</div>
-        <div style="font-size:.7rem;color:var(--sub);">${r.date}</div></div>
-        <div style="font-size:.8rem;font-weight:900;color:var(--red);">-${r.p}⭐</div>
-      </div>`;
+      hh+=`<div class="hist-item"><div style="font-size:1.3rem;">${r.e}</div>
+        <div style="flex:1;"><div style="font-size:.88rem;font-weight:900;color:#fff;">${r.n}</div>
+        <div style="font-size:.75rem;color:var(--sub);">${r.date}</div></div>
+        <div style="font-size:.82rem;font-weight:900;color:var(--red);">-${r.p}點</div></div>`;
     });
     hh+='</div>';content.innerHTML+=hh;
   }
 
-  // Admin reward management
+  // Gift points + child switcher (parent)
   if(isParent()){
-    content.innerHTML+=`<div style="padding:0 14px 14px;">
-      <div style="font-size:.82rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">⚙️ 管理獎勵</div>
-      <div style="background:var(--panel);border:1px solid var(--bd);border-radius:14px;overflow:hidden;">
-        <div class="add-form">
-          <div class="af-title">➕ 新增獎勵</div>
-          <div class="arow"><input class="ai sm" id="siE" placeholder="🎮" maxlength="4"><input class="ai" id="siN" placeholder="獎勵名稱"><input class="ai sm" id="siP" type="number" placeholder="點數" min="1"></div>
-          <button class="add-btn" onclick="addReward()" style="width:100%;padding:11px;">加入獎勵</button>
-        </div>
-        <div id="rewardMgList"></div>
-      </div>
-    </div>`;
-    setTimeout(()=>renderRewardMgList(),10);
-
+    const sw=document.createElement('div');sw.style.cssText='padding:0 14px 8px;';
+    if(asn&&asn.length>1){
+      const row2=document.createElement('div');row2.style.cssText='display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;';
+      asn.forEach(ch=>{
+        const b=document.createElement('button');
+        b.style.cssText='padding:5px 12px;border-radius:18px;border:1.5px solid '+(ch.id===uid?'var(--gold)':'var(--bd)')+';background:'+(ch.id===uid?'rgba(251,191,36,.1)':'var(--p2)')+';color:'+(ch.id===uid?'var(--gold)':'var(--sub)')+';font-family:Nunito,sans-serif;font-weight:800;font-size:.82rem;cursor:pointer;';
+        b.textContent=ch.avatar+' '+ch.name;
+        b.onclick=()=>{VID=ch.id;renderRewards();};
+        row2.appendChild(b);
+      });
+      sw.appendChild(row2);
+    }
+    content.prepend(sw);
   }
-  content.innerHTML+='<div style="height:14px;"></div>';
+}
+
+function addIrTask2(){
+  const admin=getAdmin();if(!admin)return;
+  const inp=document.getElementById('irMgInp2');if(!inp||!inp.value.trim())return;
+  if(!admin.instantRewards)admin.instantRewards=[];
+  admin.instantRewards.push({id:'ir'+Date.now(),text:inp.value.trim()});
+  try{localStorage.setItem('ir_admin',JSON.stringify(admin.instantRewards));}catch(e){}
+  inp.value='';save();renderIrMgList2();renderInstantRewardDisplay(VID);
+}
+
+function renderIrMgList2(){
+  const el=document.getElementById('irMgList2');if(!el)return;
+  const admin=getAdmin();const rewards=(admin&&admin.instantRewards)||[];
+  el.innerHTML='';
+  if(!rewards.length){el.innerHTML='<div style="font-size:.8rem;color:var(--sub);">還沒有今日獎勵</div>';return;}
+  rewards.forEach(function(r,i){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);';
+    row.innerHTML='<span>⚡</span><span style="flex:1;font-size:.85rem;font-weight:800;color:#fff;">'+r.text+'</span>';
+    var del=document.createElement('button');del.style.cssText='background:none;border:none;color:var(--sub);cursor:pointer;';del.textContent='✕';
+    del.onclick=function(){admin.instantRewards.splice(i,1);try{localStorage.setItem('ir_admin',JSON.stringify(admin.instantRewards));}catch(e){}save();renderIrMgList2();renderInstantRewardDisplay(VID);};
+    row.appendChild(del);el.appendChild(row);
+  });
+}
+
+function delRewardItem(id){
+  const admin=getAdmin();if(!admin||!admin.rewards)return;
+  admin.rewards=admin.rewards.filter(r=>r.id!==id);
+  save();renderRewards();
 }
 
 
