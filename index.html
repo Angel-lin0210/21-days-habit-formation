@@ -320,7 +320,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .dw .dw-i{font-size:.9rem;}
 .dw.success{background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;}
 .dw.today{background:var(--gold);color:#000;}
-.dw.miss{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);color:var(--red);}
+.dw.miss{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);color:var(--red);}.dw.slow{background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);color:var(--gold);}
 .dw.future{background:var(--p2);border:1px solid var(--bd);color:var(--sub);}
 .no-challenge{padding:40px 20px;text-align:center;color:var(--sub);}
 .nc-emoji{font-size:3rem;margin-bottom:12px;}
@@ -2076,16 +2076,23 @@ function renderProgress(){
     wall.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--sub);font-size:.88rem;font-weight:700;">還沒開始挑戰</div>';
     return;
   }
-  const startStr2=u.challengeStart.slice(0,10);
-  const [py,pm,pd]=startStr2.split('-').map(Number);
+  // Parse challengeStart handling both ISO and local formats
+  let _py,_pm,_pd;
+  if(u.challengeStart.includes('T')){
+    const _loc=new Date(u.challengeStart);
+    _py=_loc.getFullYear();_pm=_loc.getMonth()+1;_pd=_loc.getDate();
+  } else {
+    [_py,_pm,_pd]=u.challengeStart.split('-').map(Number);
+  }
   for(let i=0;i<21;i++){
-    const d=new Date(py,pm-1,pd+i);
+    const d=new Date(_py,_pm-1,_pd+i);
     const k=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
     const todayK=tk();
     const log=(logs[uid]||[]).find(l=>l.date===k);
     const isFuture=d>new Date()&&k!==todayK;
     let cls='dw',ico='';
     if(log&&log.completed){cls+=' success';ico='⚔️';}
+    else if(log&&log.dmg>0){cls+=' slow';ico='🐢';} // Checked in but too slow
     else if(k===todayK){cls+=' today';ico='⏳';}
     else if(isFuture){cls+=' future';ico='';}
     else{cls+=' miss';ico='✗';}
