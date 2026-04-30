@@ -1296,7 +1296,8 @@ async function save(){
           cl_xp:l.clXP||0,parent_xp:l.parentXP||0,dmg:l.dmg||0,
           type:l.type||-1,completed:l.completed||false,
           checklist:l.checklist||null,parent_rating:l.parentRating??null,
-          msgs:l.msgs||null
+          msgs:l.msgs||null,
+          secondary_done:l.secondaryDone||null
         },true);
       }
       // Upsert redeems
@@ -1355,7 +1356,8 @@ async function load(){
       newLogs[uid]=(ls||[]).map(l=>({
         date:l.date,xp:l.xp,attackXP:l.attack_xp,clXP:l.cl_xp,
         parentXP:l.parent_xp,dmg:l.dmg,type:l.type,completed:l.completed,
-        checklist:l.checklist,parentRating:l.parent_rating,msgs:l.msgs
+        checklist:l.checklist,parentRating:l.parent_rating,msgs:l.msgs,
+        secondaryDone:l.secondary_done||null
       }));
     }
     // Load redeems from users table
@@ -1784,11 +1786,7 @@ function renderToday(){
   // Message
   // Rating
   // Milestone check
-  const ms=MILESTONES.find(m=>m.day===days21&&tlog?.completed);
-  if(ms&&!sessionStorage.getItem('ms_shown_'+uid+'_'+days21)){
-    sessionStorage.setItem('ms_shown_'+uid+'_'+days21,'1');
-    setTimeout(()=>modal('🎉','里程碑達成！',ms.e+' '+ms.reward,'第'+days21+'天完成！太棒了！'),500);
-  }
+  // Milestone popup handled in doAttack - not here
 }
 
 // ── ATTACK ──
@@ -1839,12 +1837,13 @@ function doAttack(type){
   }
   const days21=get21(uid);
   const ms=MILESTONES.find(m=>m.day===days21);
-  if(ms&&!sessionStorage.getItem('ms_shown_'+uid+'_'+days21)){
-    sessionStorage.setItem('ms_shown_'+uid+'_'+days21,'1');
+  const u2=cu(uid);
+  // Only show milestone popup if: reached AND not yet claimed
+  if(ms&&u2&&!(u2.claimedMs&&u2.claimedMs[ms.day])){
     const customMs=getMilestoneRewards(uid);
     const reward=customMs[ms.day]||ms;
     if(reward.xp>0){const tl2=logs[uid].find(l=>l.date===tk());if(tl2)tl2.xp=(tl2.xp||0)+reward.xp;save();}
-    setTimeout(()=>{confetti();modal('🎉',reward.e+' '+reward.name,reward.xp>0?'+'+reward.xp+' XP':'',reward.desc||'第'+days21+'天里程碑！太棒了！');},600);
+    setTimeout(()=>{confetti();modal('🎉',reward.e+' '+reward.name,reward.xp>0?'+'+reward.xp+' XP':'','Day'+days21+'里程碑！點任務頁的里程碑格子領取！');},600);
   } else {
     setTimeout(()=>modal(res.dmg>=10?'💥':'⚔️',res.label,res.xp>0?'+'+res.xp+' XP':'',res.msg),300);
   }
