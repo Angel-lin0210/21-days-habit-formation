@@ -2176,94 +2176,109 @@ function giveRating(uid,ri){
 // PROGRESS
 // ════════════════════════════════════════
 function renderProgress(){
-  if(!VID){
-    const kids=users.filter(u=>u.role==='child');
-    if(kids.length)VID=kids[0].id;
-  }
+  if(!VID){const kids=users.filter(u=>u.role==='child');if(kids.length)VID=kids[0].id;}
   if(!VID)return;
   const uid=VID;const u=cu(uid);if(!u)return;
-  const days21=get21(uid);const streak=getStreak(uid);
+  const admin=getAdmin();
 
-  // Header
-  document.getElementById('phTitle').textContent=(u.habitEmoji||'⭐')+' '+(u.habitName||'習慣');
-  document.getElementById('phSub').textContent=(isParent()?'👁 ':'')+u.name+'・連勝'+streak+'天・完成'+days21+'/21天';
+  document.getElementById('phTitle').textContent=(u.habitEmoji||'⭐')+' '+(u.habitName||'習慣挑戰');
+  document.getElementById('phSub').textContent=u.name+'・連勝'+getStreak(uid)+'天・完成'+get21(uid)+'/21天';
   document.getElementById('phStats').innerHTML='';
 
-  // Child switcher (parent only)
-  const asn=assigned();const pcSw=document.getElementById('progressChildSw');
+  // Child switcher (parent)
+  const pcSw=document.getElementById('progressChildSw');
+  const asn=assigned();
   if(isParent()&&asn.length>1){
-    pcSw.style.display='block';
-    const btns=document.getElementById('progressChildBtns');btns.innerHTML='';
-    asn.forEach(ch=>{
-      const b=document.createElement('button');
-      b.style.cssText='padding:6px 14px;border-radius:18px;border:1.5px solid '+(ch.id===VID?'var(--gold)':'var(--bd)')+';background:'+(ch.id===VID?'rgba(251,191,36,.1)':'var(--p2)')+';color:'+(ch.id===VID?'var(--gold)':'var(--sub)')+';font-family:Nunito,sans-serif;font-weight:800;font-size:.82rem;cursor:pointer;';
-      b.textContent=ch.avatar+' '+ch.name;
-      b.onclick=()=>{VID=ch.id;renderProgress();};
-      btns.appendChild(b);
-    });
+    if(pcSw)pcSw.style.display='block';
+    const btns=document.getElementById('progressChildBtns');
+    if(btns){btns.innerHTML='';
+      asn.forEach(function(ch){
+        const b=document.createElement('button');
+        b.style.cssText='padding:6px 14px;border-radius:18px;border:1.5px solid '+(ch.id===VID?'var(--gold)':'var(--bd)')+';background:'+(ch.id===VID?'rgba(251,191,36,.1)':'var(--p2)')+';color:'+(ch.id===VID?'var(--gold)':'var(--sub)')+';font-family:Nunito,sans-serif;font-weight:800;font-size:.82rem;cursor:pointer;';
+        b.textContent=ch.avatar+' '+ch.name;
+        b.onclick=function(){VID=ch.id;renderProgress();};
+        btns.appendChild(b);
+      });
+    }
   } else if(pcSw) pcSw.style.display='none';
 
-  // Hide milestone row and insight - only calendar
-  const msRow=document.getElementById('msRow');if(msRow)msRow.parentElement.style.display='none';
-  const msInsight=document.getElementById('msInsightWrap');if(msInsight)msInsight.style.display='none';
-  const msMgWrap=document.getElementById('msMgWrap');if(msMgWrap)msMgWrap.style.display='none';
-
-  // Per-task completion stats
-  const admin=getAdmin();
-  const tasks=(admin&&admin.sharedSecondary)||[];
-  if(tasks.length){
-    const statsDiv=document.createElement('div');
-    statsDiv.style.cssText='margin:0 14px 12px;';
-    statsDiv.innerHTML='<div style="font-size:.72rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">📊 各任務完成天數</div>';
-    tasks.forEach(function(task){
-      const isMain=task.id===(admin&&admin.mainTaskId);
-      const taskDays=(logs[uid]||[]).filter(function(l){
-        return l.secondaryDone&&l.secondaryDone[task.id];
-      }).length;
-      const bar=document.createElement('div');
-      bar.style.cssText='margin-bottom:6px;';
-      bar.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:3px;">'
-        +'<span style="font-size:.82rem;font-weight:800;color:'+(isMain?'var(--gold)':'#fff')+';">'+(isMain?'⭐ ':'')+task.name+'</span>'
-        +'<span style="font-size:.78rem;font-weight:900;color:var(--sub);">'+taskDays+' 天</span>'
-        +'</div>'
-        +'<div style="background:var(--bd);border-radius:4px;height:6px;">'
-        +'<div style="background:'+(isMain?'var(--gold)':'var(--main)')+';border-radius:4px;height:6px;width:'+Math.min(100,taskDays/21*100)+'%;transition:width .5s;"></div>'
-        +'</div>';
-      statsDiv.appendChild(bar);
-    });
-    const progressWall=document.getElementById('progressWall');
-    if(progressWall)progressWall.parentNode.insertBefore(statsDiv,progressWall);
-    else document.getElementById('pg-progress').appendChild(statsDiv);
-  }
-
-  // Day wall - just the calendar
   const wall=document.getElementById('dayWall');if(!wall)return;
   wall.innerHTML='';
+
   if(!u.challengeStart){
     wall.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--sub);font-size:.88rem;font-weight:700;">還沒開始挑戰</div>';
     return;
   }
-  // Parse challengeStart handling both ISO and local formats
-  let _py,_pm,_pd;
-  if(u.challengeStart.includes('T')){
-    const _loc=new Date(u.challengeStart);
-    _py=_loc.getFullYear();_pm=_loc.getMonth()+1;_pd=_loc.getDate();
-  } else {
-    [_py,_pm,_pd]=u.challengeStart.split('-').map(Number);
+
+  // Parse start date
+  const cs=u.challengeStart;
+  let sy,sm,sd;
+  if(cs.includes('T')){const loc=new Date(cs);sy=loc.getFullYear();sm=loc.getMonth()+1;sd=loc.getDate();}
+  else{[sy,sm,sd]=cs.split('-').map(Number);}
+
+  const tasks=(admin&&admin.sharedSecondary)||[];
+  const todayK=tk();
+
+  // If no tasks - show single calendar
+  if(!tasks.length){
+    renderCalendar(wall, uid, sy, sm, sd, null, '📅 打卡紀錄', todayK);
+    return;
   }
-  for(let i=0;i<21;i++){
-    const d=new Date(_py,_pm-1,_pd+i);
+
+  // Each task gets its own calendar
+  tasks.forEach(function(task){
+    const isMain=task.id===(admin&&admin.mainTaskId);
+    const section=document.createElement('div');
+    section.style.cssText='margin-bottom:20px;';
+    const hdr=document.createElement('div');
+    hdr.style.cssText='font-size:.82rem;font-weight:900;color:'+(isMain?'var(--gold)':'#fff')+';margin-bottom:8px;padding:0 4px;';
+    hdr.textContent=(isMain?'⭐ ':'')+(task.e||'📌')+' '+task.name+(isMain?' (主任務)':'');
+    section.appendChild(hdr);
+    const grid=document.createElement('div');
+    grid.className='day-wall';
+    renderCalendar(grid, uid, sy, sm, sd, task.id, null, todayK);
+    section.appendChild(grid);
+    wall.appendChild(section);
+  });
+}
+
+function renderCalendar(container, uid, sy, sm, sd, taskId, title, todayK){
+  if(title){
+    const hdr=document.createElement('div');
+    hdr.style.cssText='font-size:.82rem;font-weight:900;color:#fff;margin-bottom:8px;padding:0 4px;';
+    hdr.textContent=title;container.appendChild(hdr);
+    const grid=document.createElement('div');grid.className='day-wall';
+    fillCalendar(grid,uid,sy,sm,sd,taskId,todayK);container.appendChild(grid);
+  } else {
+    fillCalendar(container,uid,sy,sm,sd,taskId,todayK);
+  }
+}
+
+function fillCalendar(grid, uid, sy, sm, sd, taskId, todayK){
+  for(var i=0;i<21;i++){
+    const d=new Date(sy,sm-1,sd+i);
     const k=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
-    const todayK=tk();
-    const log=(logs[uid]||[]).find(l=>l.date===k);
-    const isFuture=d>new Date()&&k!==todayK;
+    const isFuture=k>todayK;
+    const log=(logs[uid]||[]).find(function(l){return l.date===k;});
     let cls='dw',ico='';
-    if(log&&log.completed){cls+=' success';ico='⚔️';}
-    else if(log&&log.dmg>0){cls+=' slow';ico='🐢';} // Checked in but too slow
-    else if(k===todayK){cls+=' today';ico='⏳';}
-    else if(isFuture){cls+=' future';ico='';}
-    else{cls+=' miss';ico='✗';}
-    wall.innerHTML+=`<div class="${cls}"><div class="dw-n">${i+1}</div><div class="dw-i">${ico}</div></div>`;
+    if(taskId){
+      // Per-task calendar
+      const done=log&&log.secondaryDone&&log.secondaryDone[taskId];
+      if(done){cls+=' success';ico='✅';}
+      else if(k===todayK){cls+=' today';ico='⏳';}
+      else if(isFuture){cls+=' future';}
+      else{cls+=' miss';ico='✗';}
+    } else {
+      // Overall completion calendar
+      if(log&&log.completed){cls+=' success';ico='⚔️';}
+      else if(log&&log.dmg>0){cls+=' slow';ico='🐢';}
+      else if(k===todayK){cls+=' today';ico='⏳';}
+      else if(isFuture){cls+=' future';}
+      else{cls+=' miss';ico='✗';}
+    }
+    const cell=document.createElement('div');cell.className=cls;
+    cell.innerHTML='<div class="dw-n">'+(i+1)+'</div><div class="dw-i">'+ico+'</div>';
+    grid.appendChild(cell);
   }
 }
 
@@ -2450,6 +2465,15 @@ function renderIrMgList2(){
   });
 }
 
+function completeRedeem(uid,redeemId){
+  const hist=redeemHist[uid]||[];
+  const item=hist.find(function(r){return r.id===redeemId;});
+  if(!item)return;
+  item.status='done';
+  save();renderRewards();
+  modal('✅','兌換完成！','','「'+item.n+'」已完成兌換！');
+}
+
 function delRewardItem(id){
   const admin=getAdmin();if(!admin||!admin.rewards)return;
   admin.rewards=admin.rewards.filter(r=>r.id!==id);
@@ -2464,13 +2488,13 @@ function reqRedeem(uid,id){
   if(!item)return;
   const avail=getAvail(uid);
   if(avail<(item.p||0)){modal('⚠️','點數不足','','再加油賺更多點數！');return;}
-  if(!pendingRedeems[uid])pendingRedeems[uid]=[];
-  // Prevent duplicate pending for same item
-  if(pendingRedeems[uid].some(r=>r.id===id)){
-    modal('⏳','已在申請中','','等家長審核！');return;
-  }
-  pendingRedeems[uid].push({id,e:item.e,n:item.n,p:item.p});
-  save();renderRewards();modal('📨','申請送出！','','等家長審核！');
+  // Deduct points immediately via redeemHist with status 'pending'
+  const n=new Date();
+  const dateStr=n.getFullYear()+'/'+(n.getMonth()+1)+'/'+n.getDate();
+  if(!redeemHist[uid])redeemHist[uid]=[];
+  redeemHist[uid].push({id:'rd'+Date.now(),itemId:id,e:item.e,n:item.n,p:item.p,date:dateStr,status:'pending'});
+  save();renderRewards();
+  modal('🎁','兌換成功！','已扣除 '+item.p+' 點','等家長完成兌換！');
 }
 function giftPoints(){
   const uid=VID;const u=cu(uid);if(!u)return;
@@ -2865,6 +2889,15 @@ function saveMsReward(day){
   save();renderMsMgList();modal('💾','里程碑獎勵已更新！','','Day '+day+' 的獎勵設定好了！');
 }
 
+function completeRedeem(uid,redeemId){
+  const hist=redeemHist[uid]||[];
+  const item=hist.find(function(r){return r.id===redeemId;});
+  if(!item)return;
+  item.status='done';
+  save();renderRewards();
+  modal('✅','兌換完成！','','「'+item.n+'」已完成兌換！');
+}
+
 function delRewardItem(id){
   const admin=getAdmin();if(!admin)return;
   if(!confirm('確定移除這個獎勵嗎？'))return;
@@ -2881,7 +2914,7 @@ function addReward(){
   const e=document.getElementById('siE')?.value.trim()||'🎁';
   const n=document.getElementById('siN')?.value.trim();
   const p=parseInt(document.getElementById('siP')?.value)||0;
-  if(!n||p<1){modal('⚠️','請填名稱和點數','','');return;}
+  if(!n){modal('⚠️','請填寫獎勵名稱','','');return;}
   const uid=VID||assigned()[0]?.id;const u=cu(uid);if(!u)return;
   if(!u.rewards)u.rewards=JSON.parse(JSON.stringify(DEF_REWARDS));
   if(!u._rc)u._rc=100;u._rc++;
