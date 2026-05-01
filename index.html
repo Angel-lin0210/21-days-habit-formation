@@ -1286,7 +1286,8 @@ async function save(){
         shared_checklist:u.sharedChecklist||null,
         shared_secondary:u.sharedSecondary||null,
         disabled_tasks:u.disabledTasks||null,
-        secondary_tasks:u.secondaryTasks||null
+        secondary_tasks:u.secondaryTasks||null,
+        main_task_id:u.mainTaskId||null
       },true);
       // Upsert logs
       const userLogs=logs[u.id]||[];
@@ -2298,202 +2299,68 @@ function fillCalendar(grid, uid, sy, sm, sd, taskId, todayK){
 
 
 function renderRewards(){
-  // Auto-assign VID
   if(!VID&&isParent()){const kids=users.filter(u=>u.role==='child');if(kids.length)VID=kids[0].id;}
-  const uid=VID||(CU&&CU.role==='child'?CU.id:null);
-  if(!uid)return;
-  const u=cu(uid);
-  const avail=getAvail(uid);
-  const pr=pendingRedeems[uid]||[];
-
-  document.getElementById('rwPts').textContent=avail;
-  const rwChildName=u?.name||'';
-  const rwNm=document.getElementById('rwChildName');if(rwNm)rwNm.textContent=isParent()?rwChildName:'';
-
-  const content=document.getElementById('rewardsContent');
-  if(!content)return;
-  content.innerHTML='';
-
-  // ── PARENT: settings on top ──
+  const uid=VID||(CU&&CU.role==='child'?CU.id:null);if(!uid)return;
+  const u=cu(uid);const avail=getAvail(uid);const admin=getAdmin();
+  const content=document.getElementById('rewardsContent');if(!content)return;
+  content.innerHTML='';document.getElementById('rwPts').textContent=avail;
   if(isParent()){
-    // Today's reward setting
-    content.innerHTML+=`<div class="set-sec"><div class="set-lbl">⚡ 今日獎勵設定</div>
-      <div class="set-card" style="padding:14px;">
-        <div style="font-size:.82rem;font-weight:700;color:rgba(255,255,255,.7);margin-bottom:10px;">完成4個以上任務後解鎖的當日獎勵</div>
-        <div id="irMgList2" style="margin-bottom:8px;"></div>
-        <div style="display:flex;gap:6px;">
-          <input id="irMgInp2" class="ai" placeholder="🍬 今天可以吃一顆糖" style="flex:1;margin-bottom:0;">
-          <button onclick="addIrTask2()" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-family:Nunito,sans-serif;font-weight:900;cursor:pointer;">+</button>
-        </div>
-      </div></div>`;
-
-    // Reward shop setting  
-    content.innerHTML+=`<div class="set-sec"><div class="set-lbl">🎁 商品獎勵設定</div>
-      <div class="set-card"><div class="add-form">
-        <div class="arow">
-          <input class="ai sm" id="siE" placeholder="🎁" maxlength="4">
-          <input class="ai" id="siN" placeholder="獎勵名稱" maxlength="16">
-          <input class="ai sm" id="siP" type="number" placeholder="點數" min="1">
-        </div>
-        <button class="add-btn" onclick="addReward()" style="width:100%;padding:11px;">新增商品獎勵</button>
-      </div>
-      <div id="rewardMgList"></div></div></div>`;
-
-    setTimeout(()=>{renderIrMgList2();renderRewardMgList();},10);
+    content.innerHTML=
+      '<div class="set-sec"><div class="set-lbl">' + String.fromCharCode(9889) + ' ' + '\u4eca\u65e5\u734e\u52f5\u8a2d\u5b9a' + '</div>'
+      +'<div class="set-card" style="padding:14px;">'
+      +'<div id="irMgList2" style="margin-bottom:8px;"></div>'
+      +'<div style="display:flex;gap:6px;">'
+      +'<input id="irMgInp2" class="ai" placeholder="\ud83c\udf6c \u4eca\u5929\u53ef\u4ee5\u5403\u4e00\u984c\u7cd6" style="flex:1;margin-bottom:0;">'
+      +'<button onclick="addIrTask2()" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-family:Nunito,sans-serif;font-weight:900;cursor:pointer;">+</button>'
+      +'</div></div></div>'
+      +'<div class="set-sec"><div class="set-lbl">\ud83c\udfc5 \u91cc\u7a0b\u7891\u734e\u52f5\u8a2d\u5b9a</div>'
+      +'<div class="set-card"><div id="msMgCard3" style="padding:4px 0;"></div></div></div>'
+      +'<div class="set-sec"><div class="set-lbl">\ud83c\udf81 \u5546\u54c1\u734e\u52f5\u8a2d\u5b9a</div>'
+      +'<div class="set-card"><div class="add-form">'
+      +'<div class="arow">'
+      +'<input class="ai sm" id="siE" placeholder="\ud83c\udf81" maxlength="4">'
+      +'<input class="ai" id="siN" placeholder="\u734e\u52f5\u540d\u7a31" maxlength="16">'
+      +'<input class="ai sm" id="siP" type="number" placeholder="\u9ede\u6578" min="0">'
+      +'</div>'
+      +'<button class="add-btn" onclick="addReward()" style="width:100%;padding:11px;">\u65b0\u589e\u5546\u54c1\u734e\u52f5</button>'
+      +'</div><div id="rewardMgList"></div></div></div>';
+    setTimeout(function(){renderIrMgList2();renderMsMgListIn(document.getElementById('msMgCard3'),uid);renderRewardMgList();},10);
+    return;
   }
-
-  // ── ALL: pending approvals (parent sees all kids) ──
-  if(isParent()){
-    const allKids=users.filter(u=>u.role==='child');
-    let allPending=[];
-    allKids.forEach(kid=>{(pendingRedeems[kid.id]||[]).forEach((r,i)=>{allPending.push({kid,r,i});});});
-    if(allPending.length){
-      let html='<div style="padding:14px 14px 0;"><div class="ps-title">⏳ 待審核申請</div>';
-      allPending.forEach(({kid,r,i})=>{
-        html+=`<div class="pending-item">
-          <div style="font-size:1.5rem;">${r.e}</div>
-          <div style="flex:1;"><div style="font-size:.9rem;font-weight:900;color:#fff;">${r.n}</div>
-          <div style="font-size:.78rem;color:var(--sub);">${kid.avatar} ${kid.name}・${r.p||0} 點</div></div>
-          <button style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.82rem;cursor:pointer;margin-right:5px;" onclick="aprRedeem('${kid.id}',${i})">✓ 批准</button>
-          <button style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:var(--red);border-radius:8px;padding:7px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.82rem;cursor:pointer;" onclick="rejRedeem('${kid.id}',${i})">✕</button>
-        </div>`;
-      });
-      html+='</div>';content.innerHTML+=html;
-    }
+  var pendingItems=(redeemHist[uid]||[]).filter(function(r){return r.status==='pending';});
+  if(pendingItems.length){
+    var ph='<div style="padding:0 14px 8px;"><div class="ps-title">\u5151\u63db\u4e2d</div>';
+    pendingItems.forEach(function(r){ph+='<div class="reward-item" style="margin-bottom:8px;"><div class="ri-ico">'+r.e+'</div><div class="ri-info"><div class="ri-name">'+r.n+'</div><div class="ri-cost">-'+r.p+' \u9ede</div></div><div style="font-size:.78rem;font-weight:800;color:var(--gold);padding:4px 8px;">\u5151\u63db\u4e2d...</div></div>';});
+    ph+='</div>';content.innerHTML+=ph;
   }
-
-  const admin=getAdmin();
-  // ── PARENT: milestone setting ──
-  if(isParent()){
-    var msSetDiv=document.createElement('div');
-    msSetDiv.className='set-sec';
-    msSetDiv.innerHTML='<div class="set-lbl">🏅 里程碑獎勵設定</div>'
-      +'<div class="set-card"><div id="msMgCard2" style="padding:8px 0;"></div></div>';
-    content.appendChild(msSetDiv);
-    setTimeout(function(){
-      var el=document.getElementById('msMgCard2');
-      if(el)renderMsMgListIn(el,uid);
-    },10);
-  }
-  // ── ALL: milestone claim ──
-  const ms_rewards=document.createElement('div');
-  ms_rewards.style.cssText='padding:0 14px 8px;';
-  ms_rewards.innerHTML='<div style="font-size:.82rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">🏅 里程碑獎勵</div>';
+  var msDiv=document.createElement('div');msDiv.style.cssText='padding:0 14px 8px;';
+  var msTtl=document.createElement('div');msTtl.style.cssText='font-size:.82rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;';msTtl.textContent='\ud83c\udfc5 \u91cc\u7a0b\u7891\u734e\u52f5';msDiv.appendChild(msTtl);
   MILESTONES.forEach(function(ms){
-    const customMs=getMilestoneRewards(uid);
-    const reward=customMs[ms.day]||ms;
-    const streak=getStreak(uid);
-    const unlocked=streak>=ms.day;
-    const claimed=u&&u.claimedMs&&u.claimedMs[ms.day];
-    const row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;gap:12px;background:var(--panel);border:1.5px solid '+(claimed?'var(--green)':unlocked?'var(--gold)':'var(--bd)')+';border-radius:12px;padding:12px 14px;margin-bottom:8px;';
-    row.innerHTML='<div style="font-size:1.6rem;">'+(claimed?'✅':unlocked?reward.e:'🔒')+'</div>'
-      +'<div style="flex:1;">'
-      +'<div style="font-size:.88rem;font-weight:900;color:'+(unlocked?'#fff':'var(--sub)')+';">Day '+ms.day+' 里程碑</div>'
-      +'<div style="font-size:.78rem;color:'+(unlocked?'var(--gold)':'var(--sub)')+';">'+(claimed?'已領取':unlocked?reward.name+'（點我領取！）':'主任務連續'+ms.day+'天後解鎖')+'</div>'
-      +'</div>';
-    if(unlocked&&!claimed){
-      const btn=document.createElement('button');
-      btn.style.cssText='background:var(--gold);color:#000;border:none;border-radius:8px;padding:7px 12px;font-family:Nunito,sans-serif;font-weight:900;font-size:.82rem;cursor:pointer;';
-      btn.textContent='領取！';
-      btn.onclick=function(){claimMilestone(uid,ms.day);};
-      row.appendChild(btn);
-    }
-    ms_rewards.appendChild(row);
+    var cr=getMilestoneRewards(uid);var rw=cr[ms.day]||ms;
+    var streak=getStreak(uid);var unlocked=streak>=ms.day;var claimed=u&&u.claimedMs&&u.claimedMs[ms.day];
+    var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:12px;background:var(--panel);border:1.5px solid '+(claimed?'var(--green)':unlocked?'var(--gold)':'var(--bd)')+';border-radius:12px;padding:12px 14px;margin-bottom:8px;';
+    row.innerHTML='<div style="font-size:1.6rem;">'+(claimed?'\u2705':unlocked?rw.e:'\ud83d\udd12')+'</div><div style="flex:1;"><div style="font-size:.88rem;font-weight:900;color:'+(unlocked?'#fff':'var(--sub)')+';">Day '+ms.day+'</div><div style="font-size:.78rem;color:'+(unlocked?'var(--gold)':'var(--sub)')+';">'+(claimed?'\u5df2\u9818\u53d6':unlocked?rw.name+'(\u9ede\u6211\u9818\u53d6\uff01)':'\u4e3b\u4efb\u52d9\u9023\u7e8c'+ms.day+'\u5929\u89e3\u9396')+'</div></div>';
+    if(unlocked&&!claimed){var b2=document.createElement('button');b2.style.cssText='background:var(--gold);color:#000;border:none;border-radius:8px;padding:7px 12px;font-family:Nunito,sans-serif;font-weight:900;font-size:.82rem;cursor:pointer;';b2.textContent='\u9818\u53d6\uff01';b2.onclick=(function(d){return function(){claimMilestone(uid,d);};})(ms.day);row.appendChild(b2);}
+    msDiv.appendChild(row);
   });
-  content.appendChild(ms_rewards);
-
-  // ── SHOP ──
-  const items=((admin?.rewards?.length?admin.rewards:null)||(u?.rewards?.length?u.rewards:null)||DEF_REWARDS).sort((a,b)=>(a.p||0)-(b.p||0));
-  let shopHtml='<div style="padding:0 14px 8px;">'
-    +'<div style="font-size:.82rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">🎁 獎勵商店</div>';
-  items.forEach(item=>{
-    const can=avail>=(item.p||0);
-    const pend=pr.some(r=>r.id===item.id);
-    let btn;
-    if(isParent()){btn='<div style="font-size:.75rem;font-weight:800;color:var(--sub);padding:4px 8px;">等待申請</div>';}
-    else if(pend){btn='<button class="ri-btn ri-pend">申請中…</button>';}
-    else if(can){btn=`<button class="ri-btn ri-can" onclick="reqRedeem('${uid}','${item.id}')">兌換！</button>`;}
-    else{btn=`<button class="ri-btn ri-cant">還差${(item.p||0)-avail}點</button>`;}
-    const delBtn=isParent()?`<button onclick="delRewardItem('${item.id}')" style="background:none;border:none;color:var(--sub);font-size:1rem;cursor:pointer;padding:4px 6px;">✕</button>`:'';
-    shopHtml+=`<div class="reward-item" style="margin-bottom:8px;">
-      <div class="ri-ico">${item.e}</div>
-      <div class="ri-info"><div class="ri-name">${item.n}</div><div class="ri-cost">⭐ ${item.p||0} 點</div></div>
-      ${btn}${delBtn}</div>`;
+  content.appendChild(msDiv);
+  var sitems=((admin&&admin.rewards&&admin.rewards.length)?admin.rewards:(u&&u.rewards&&u.rewards.length?u.rewards:DEF_REWARDS)).slice().sort(function(a,b){return(a.p||0)-(b.p||0);});
+  var sh='<div style="padding:0 14px 8px;"><div style="font-size:.82rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">\ud83c\udf81 \u734e\u52f5\u5546\u5e97</div>';
+  sitems.forEach(function(item){
+    var can=avail>=(item.p||0);var alrPend=(redeemHist[uid]||[]).some(function(r){return r.itemId===item.id&&r.status==='pending';});
+    var sbtn;if(alrPend)sbtn='<button class="ri-btn ri-pend">\u5151\u63db\u4e2d...</button>';
+    else if(can){var _b=document.createElement('button');_b.className='ri-btn ri-can';_b.textContent='\u5151\u63db\uff01';_b.onclick=(function(a,b){return function(){reqRedeem(a,b);};})(uid,item.id);sbtn=_b.outerHTML;}
+    else sbtn='<button class="ri-btn ri-cant">\u9084\u5dee'+((item.p||0)-avail)+'\u9ede</button>';
+    sh+='<div class="reward-item" style="margin-bottom:8px;"><div class="ri-ico">'+item.e+'</div><div class="ri-info"><div class="ri-name">'+item.n+'</div><div class="ri-cost">\u2b50 '+(item.p||0)+' \u9ede</div></div>'+sbtn+'</div>';
   });
-  shopHtml+='</div>';
-  content.innerHTML+=shopHtml;
-
-  // ── HISTORY ──
-  const hist=redeemHist[uid]||[];
-  if(hist.length){
-    let hh='<div style="padding:0 14px 14px;"><div class="ps-title">📜 兌換紀錄</div>';
-    [...hist].reverse().slice(0,10).forEach(r=>{
-      hh+=`<div class="hist-item"><div style="font-size:1.3rem;">${r.e}</div>
-        <div style="flex:1;"><div style="font-size:.88rem;font-weight:900;color:#fff;">${r.n}</div>
-        <div style="font-size:.75rem;color:var(--sub);">${r.date}</div></div>
-        <div style="font-size:.82rem;font-weight:900;color:var(--red);">-${r.p}點</div></div>`;
-    });
+  sh+='</div>';content.innerHTML+=sh;
+  var dh=(redeemHist[uid]||[]).filter(function(r){return r.status==='done'||!r.status;});
+  if(dh.length){
+    var hh='<div style="padding:0 14px 14px;"><div class="ps-title">\ud83d\udcd6 \u5151\u63db\u7d00\u9304</div>';
+    dh.slice().reverse().slice(0,10).forEach(function(r){hh+='<div class="hist-item" style="opacity:.6;"><div style="font-size:1.3rem;">'+r.e+'</div><div style="flex:1;"><div style="font-size:.88rem;color:var(--sub);text-decoration:line-through;font-weight:900;">'+r.n+'</div><div style="font-size:.75rem;color:var(--sub);">'+r.date+'</div></div><div style="font-size:.82rem;font-weight:900;color:var(--sub);">-'+r.p+'\u9ede</div></div>';});
     hh+='</div>';content.innerHTML+=hh;
   }
-
-  // Gift points + child switcher (parent)
-  if(isParent()){
-    const sw=document.createElement('div');sw.style.cssText='padding:0 14px 8px;';
-    if(asn&&asn.length>1){
-      const row2=document.createElement('div');row2.style.cssText='display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;';
-      asn.forEach(ch=>{
-        const b=document.createElement('button');
-        b.style.cssText='padding:5px 12px;border-radius:18px;border:1.5px solid '+(ch.id===uid?'var(--gold)':'var(--bd)')+';background:'+(ch.id===uid?'rgba(251,191,36,.1)':'var(--p2)')+';color:'+(ch.id===uid?'var(--gold)':'var(--sub)')+';font-family:Nunito,sans-serif;font-weight:800;font-size:.82rem;cursor:pointer;';
-        b.textContent=ch.avatar+' '+ch.name;
-        b.onclick=()=>{VID=ch.id;renderRewards();};
-        row2.appendChild(b);
-      });
-      sw.appendChild(row2);
-    }
-    content.prepend(sw);
-  }
 }
-
-function addIrTask2(){
-  const admin=getAdmin();if(!admin)return;
-  const inp=document.getElementById('irMgInp2');if(!inp||!inp.value.trim())return;
-  if(!admin.instantRewards)admin.instantRewards=[];
-  admin.instantRewards.push({id:'ir'+Date.now(),text:inp.value.trim()});
-  try{localStorage.setItem('ir_admin',JSON.stringify(admin.instantRewards));}catch(e){}
-  inp.value='';save();renderIrMgList2();renderInstantRewardDisplay(VID);
-}
-
-function renderIrMgList2(){
-  const el=document.getElementById('irMgList2');if(!el)return;
-  const admin=getAdmin();const rewards=(admin&&admin.instantRewards)||[];
-  el.innerHTML='';
-  if(!rewards.length){el.innerHTML='<div style="font-size:.8rem;color:var(--sub);">還沒有今日獎勵</div>';return;}
-  rewards.forEach(function(r,i){
-    var row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);';
-    row.innerHTML='<span>⚡</span><span style="flex:1;font-size:.85rem;font-weight:800;color:#fff;">'+r.text+'</span>';
-    var del=document.createElement('button');del.style.cssText='background:none;border:none;color:var(--sub);cursor:pointer;';del.textContent='✕';
-    del.onclick=function(){admin.instantRewards.splice(i,1);try{localStorage.setItem('ir_admin',JSON.stringify(admin.instantRewards));}catch(e){}save();renderIrMgList2();renderInstantRewardDisplay(VID);};
-    row.appendChild(del);el.appendChild(row);
-  });
-}
-
-function completeRedeem(uid,redeemId){
-  const hist=redeemHist[uid]||[];
-  const item=hist.find(function(r){return r.id===redeemId;});
-  if(!item)return;
-  item.status='done';
-  save();renderRewards();
-  modal('✅','兌換完成！','','「'+item.n+'」已完成兌換！');
-}
-
-function delRewardItem(id){
-  const admin=getAdmin();if(!admin||!admin.rewards)return;
-  admin.rewards=admin.rewards.filter(r=>r.id!==id);
-  save();renderRewards();
-}
-
 
 function reqRedeem(uid,id){
   const u=cu(uid);const admin=getAdmin();
