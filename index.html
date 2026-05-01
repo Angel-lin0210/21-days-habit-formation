@@ -2305,25 +2305,16 @@ function renderRewards(){
   const content=document.getElementById('rewardsContent');if(!content)return;
   content.innerHTML='';document.getElementById('rwPts').textContent=avail;
   if(isParent()){
-    content.innerHTML=
-      '<div class="set-sec"><div class="set-lbl">' + String.fromCharCode(9889) + ' ' + '\u4eca\u65e5\u734e\u52f5\u8a2d\u5b9a' + '</div>'
-      +'<div class="set-card" style="padding:14px;">'
-      +'<div id="irMgList2" style="margin-bottom:8px;"></div>'
-      +'<div style="display:flex;gap:6px;">'
-      +'<input id="irMgInp2" class="ai" placeholder="\ud83c\udf6c \u4eca\u5929\u53ef\u4ee5\u5403\u4e00\u984c\u7cd6" style="flex:1;margin-bottom:0;">'
-      +'<button onclick="addIrTask2()" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-family:Nunito,sans-serif;font-weight:900;cursor:pointer;">+</button>'
-      +'</div></div></div>'
-      +'<div class="set-sec"><div class="set-lbl">\ud83c\udfc5 \u91cc\u7a0b\u7891\u734e\u52f5\u8a2d\u5b9a</div>'
-      +'<div class="set-card"><div id="msMgCard3" style="padding:4px 0;"></div></div></div>'
-      +'<div class="set-sec"><div class="set-lbl">\ud83c\udf81 \u5546\u54c1\u734e\u52f5\u8a2d\u5b9a</div>'
-      +'<div class="set-card"><div class="add-form">'
-      +'<div class="arow">'
-      +'<input class="ai sm" id="siE" placeholder="\ud83c\udf81" maxlength="4">'
-      +'<input class="ai" id="siN" placeholder="\u734e\u52f5\u540d\u7a31" maxlength="16">'
-      +'<input class="ai sm" id="siP" type="number" placeholder="\u9ede\u6578" min="0">'
-      +'</div>'
-      +'<button class="add-btn" onclick="addReward()" style="width:100%;padding:11px;">\u65b0\u589e\u5546\u54c1\u734e\u52f5</button>'
-      +'</div><div id="rewardMgList"></div></div></div>';
+    // Build parent settings using DOM (avoids innerHTML encoding issues)
+    var s1=document.createElement('div');s1.className='set-sec';
+    s1.innerHTML='<div class="set-lbl">⚡ 今日獎勵設定</div><div class="set-card" style="padding:14px;"><div id="irMgList2" style="margin-bottom:8px;"></div><div style="display:flex;gap:6px;"><input id="irMgInp2" class="ai" placeholder="🍬 今天可以吃一顆糖" style="flex:1;margin-bottom:0;"><button onclick="addIrTask2()" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-family:Nunito,sans-serif;font-weight:900;cursor:pointer;">+</button></div></div>';
+    content.appendChild(s1);
+    var s2=document.createElement('div');s2.className='set-sec';
+    s2.innerHTML='<div class="set-lbl">🏅 里程碑獎勵設定</div><div class="set-card"><div id="msMgCard3" style="padding:4px 0;"></div></div>';
+    content.appendChild(s2);
+    var s3=document.createElement('div');s3.className='set-sec';
+    s3.innerHTML='<div class="set-lbl">🎁 商品獎勵設定</div><div class="set-card"><div class="add-form"><div class="arow"><input class="ai sm" id="siE" placeholder="🎁" maxlength="4"><input class="ai" id="siN" placeholder="獎勵名稱" maxlength="16"><input class="ai sm" id="siP" type="number" placeholder="點數" min="0"></div><button class="add-btn" onclick="addReward()" style="width:100%;padding:11px;">新增商品獎勵</button></div><div id="rewardMgList"></div></div>';
+    content.appendChild(s3);
     setTimeout(function(){renderIrMgList2();renderMsMgListIn(document.getElementById('msMgCard3'),uid);renderRewardMgList();},10);
     return;
   }
@@ -3222,6 +3213,43 @@ function renderStreakRow(uid){
     +'<div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:5px 14px;font-size:.82rem;font-weight:900;color:var(--gold);">🔥 連勝 '+streak+' 天</div>'
     +'<div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:5px 14px;font-size:.82rem;font-weight:900;color:var(--purple);">📅 完成 '+days+'/21 天</div>'
     +'</div>';
+}
+
+
+function renderIrMgList2(){
+  const el=document.getElementById('irMgList2');if(!el)return;
+  const admin=getAdmin();
+  const rewards=(admin&&admin.instantRewards)||[];
+  el.innerHTML='';
+  if(!rewards.length){
+    el.innerHTML='<div style="font-size:.8rem;color:var(--sub);padding:4px 0;">還沒有今日獎勵</div>';
+    return;
+  }
+  rewards.forEach(function(r,i){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);';
+    row.innerHTML='<span>⚡</span><span style="flex:1;font-size:.85rem;font-weight:800;color:#fff;">'+r.text+'</span>';
+    var del=document.createElement('button');
+    del.style.cssText='background:none;border:none;color:var(--sub);cursor:pointer;font-size:.9rem;';
+    del.textContent='✕';
+    del.onclick=function(){
+      admin.instantRewards.splice(i,1);
+      try{localStorage.setItem('ir_admin',JSON.stringify(admin.instantRewards));}catch(e){}
+      save();renderIrMgList2();renderInstantRewardDisplay(VID);
+    };
+    row.appendChild(del);el.appendChild(row);
+  });
+}
+
+function addIrTask2(){
+  const admin=getAdmin();if(!admin)return;
+  const inp=document.getElementById('irMgInp2');
+  if(!inp||!inp.value.trim())return;
+  if(!admin.instantRewards)admin.instantRewards=[];
+  admin.instantRewards.push({id:'ir'+Date.now(),text:inp.value.trim()});
+  try{localStorage.setItem('ir_admin',JSON.stringify(admin.instantRewards));}catch(e){}
+  inp.value='';
+  save();renderIrMgList2();
 }
 
 </script>
