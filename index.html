@@ -1703,15 +1703,7 @@ function renderToday(){
     csw.innerHTML='';csw.appendChild(row);
   } else if(csw) csw.style.display='none';
   // XP bar (child only)
-  if(u&&CU.role==='child'){
-    const avail=getAvail(u.id);const lv2=getLv(u.id);
-    const xpFill=document.getElementById('xpFill');
-    if(xpFill)xpFill.style.width=Math.min(100,(lv2.xp/lv2.max*100))+'%';
-    const xpLbl=document.getElementById('xpLbl');
-    if(xpLbl)xpLbl.textContent=lv2.xp+' / '+lv2.max;
-    const xpPts=document.getElementById('xpPts');
-    if(xpPts)xpPts.textContent='可用：'+avail+' 點';
-  }
+  // XP display removed
   // Streak row
   renderStreakRow(uid);
   // Monster
@@ -1772,17 +1764,8 @@ function renderParentTaskSettings(uid){
   addBtn.onclick=function(){addTask(uid);};
   addRow.appendChild(taskInp);addRow.appendChild(ptsInp);addRow.appendChild(addBtn);
   taskCard.appendChild(addRow);outer.appendChild(taskCard);
-  // Milestone card
-  var msCard=document.createElement('div');
-  msCard.style.cssText='background:var(--panel);border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin-bottom:8px;';
-  var msHd=document.createElement('div');
-  msHd.style.cssText='padding:9px 14px;font-size:.78rem;font-weight:900;color:var(--sub);border-bottom:1px solid var(--bd);';
-  msHd.textContent='🏅 里程碑獎勵（主任務連續達成）';msCard.appendChild(msHd);
-  var msCont=document.createElement('div');msCont.id='msMgCard';msCard.appendChild(msCont);
-  outer.appendChild(msCard);
   wrap.innerHTML='';wrap.appendChild(outer);
   renderParentTaskList(uid);
-  setTimeout(function(){renderMsMgList();},10);
 }
 
 function renderParentTaskList(uid){
@@ -2233,15 +2216,25 @@ function renderProgress(){
     return;
   }
 
-  // Each task gets its own calendar section
-  tasks.forEach(function(task){
-    const isMain=task.id===(admin&&admin.mainTaskId);
+  // Sort: main task first
+  const mainTaskId=admin&&admin.mainTaskId;
+  const sorted=tasks.slice().sort(function(a,b){
+    if(a.id===mainTaskId)return -1;
+    if(b.id===mainTaskId)return 1;
+    return 0;
+  });
+
+  sorted.forEach(function(task){
+    const isMain=task.id===mainTaskId;
     const taskDays=(logs[uid]||[]).filter(function(l){return l.secondaryDone&&l.secondaryDone[task.id];}).length;
-    const sec=document.createElement('div');sec.style.cssText='margin-bottom:20px;';
+    const sec=document.createElement('div');
+    sec.style.cssText='margin-bottom:'+(isMain?'24px':'16px')+';'
+      +(isMain?'background:rgba(251,191,36,.04);border:1.5px solid rgba(251,191,36,.2);border-radius:14px;padding:12px 10px 10px;':'');
     const hdr=document.createElement('div');
-    hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 4px;';
-    hdr.innerHTML='<span style="font-size:.85rem;font-weight:900;color:'+(isMain?'var(--gold)':'#fff')+'">'+(isMain?'⭐ ':'')+task.name+(isMain?' (主任務)':'')+'</span>'
-      +'<span style="font-size:.78rem;font-weight:800;color:var(--sub);">完成 '+taskDays+' 天</span>';
+    hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+    hdr.innerHTML='<span style="font-size:'+(isMain?'.95':'0.82')+'rem;font-weight:900;color:'+(isMain?'var(--gold)':'var(--sub)')+'">'
+      +(isMain?'⭐ 主任務：':'')+task.name+'</span>'
+      +'<span style="font-size:.78rem;font-weight:800;color:'+(isMain?'var(--gold)':'var(--sub)')+';">完成 '+taskDays+' 天</span>';
     sec.appendChild(hdr);
     const grid=document.createElement('div');grid.className='day-wall';
     fillCalendar(grid,uid,sy,sm,sd,task.id,todayK);
