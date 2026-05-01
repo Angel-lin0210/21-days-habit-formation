@@ -1901,8 +1901,8 @@ function doNewAttack(uid){
   var admin=getAdmin();
   var mainTaskId=admin&&admin.mainTaskId;
   if(mainTaskId&&done[mainTaskId]){
-    var streak=getStreak(uid);
-    var ms=MILESTONES.find(function(m){return m.day===streak;});
+    var msStreak=getStreak(uid);
+    var ms=MILESTONES.find(function(m){return m.day===msStreak;});
     var cu2=cu(uid);
     if(ms&&cu2&&!(cu2.claimedMs&&cu2.claimedMs[ms.day])){
       setTimeout(function(){confetti();modal('🏅','里程碑達成！',ms.e+' Day'+ms.day,'主任務連續'+ms.day+'天！去獎勵頁領取！');},1500);
@@ -2328,9 +2328,9 @@ function renderRewards(){
   var msTtl=document.createElement('div');msTtl.style.cssText='font-size:.82rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;';msTtl.textContent='\ud83c\udfc5 \u91cc\u7a0b\u7891\u734e\u52f5';msDiv.appendChild(msTtl);
   MILESTONES.forEach(function(ms){
     var cr=getMilestoneRewards(uid);var rw=cr[ms.day]||ms;
-    var streak=getStreak(uid);var unlocked=streak>=ms.day;var claimed=u&&u.claimedMs&&u.claimedMs[ms.day];
+    var streak2=getStreak(uid);var unlocked=streak2>=ms.day;var claimed=u&&u.claimedMs&&u.claimedMs[ms.day];
     var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:12px;background:var(--panel);border:1.5px solid '+(claimed?'var(--green)':unlocked?'var(--gold)':'var(--bd)')+';border-radius:12px;padding:12px 14px;margin-bottom:8px;';
-    row.innerHTML='<div style="font-size:1.6rem;">'+(claimed?'\u2705':unlocked?rw.e:'\ud83d\udd12')+'</div><div style="flex:1;"><div style="font-size:.88rem;font-weight:900;color:'+(unlocked?'#fff':'var(--sub)')+';">Day '+ms.day+'</div><div style="font-size:.78rem;color:'+(unlocked?'var(--gold)':'var(--sub)')+';">'+(claimed?'\u5df2\u9818\u53d6':unlocked?rw.name+'(\u9ede\u6211\u9818\u53d6\uff01)':'\u4e3b\u4efb\u52d9\u9023\u7e8c'+ms.day+'\u5929\u89e3\u9396')+'</div></div>';
+    row.innerHTML='<div style="font-size:1.6rem;">'+(claimed?'\u2705':unlocked?rw.e:'\ud83d\udd12')+'</div><div style="flex:1;"><div style="font-size:.88rem;font-weight:900;color:'+(unlocked?'#fff':'var(--sub)')+';">Day '+ms.day+'</div><div style="font-size:.78rem;color:'+(unlocked?'var(--gold)':'var(--sub)')+';">'+(claimed?'\u5df2\u9818\u53d6':unlocked?rw.name+'(\u9ede\u6211\u9818\u53d6\uff01)':'\u5b8c\u6210'+ms.day+'\u5929\u5f8c\u89e3\u9396')+'</div></div>';
     if(unlocked&&!claimed){var b2=document.createElement('button');b2.style.cssText='background:var(--gold);color:#000;border:none;border-radius:8px;padding:7px 12px;font-family:Nunito,sans-serif;font-weight:900;font-size:.82rem;cursor:pointer;';b2.textContent='\u9818\u53d6\uff01';b2.onclick=(function(d){return function(){claimMilestone(uid,d);};})(ms.day);row.appendChild(b2);}
     msDiv.appendChild(row);
   });
@@ -2872,7 +2872,7 @@ function renderTodayMilestone(uid){
   const customMs=getMilestoneRewards(uid);
   let html='<div style="margin:0 14px 8px;"><div style="font-size:.72rem;font-weight:900;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">🏅 里程碑</div><div style="display:flex;gap:6px;">';
   MILESTONES.forEach(ms=>{
-    const unlocked=days21>=ms.day;
+    const unlocked=days21>=ms.day; // Use total completed days, not streak
     const reward=customMs[ms.day]||ms;
     const claimed=u.claimedMs&&u.claimedMs[ms.day];
     const isFirst=ms.day===3;
