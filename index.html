@@ -1847,11 +1847,10 @@ function doNewAttack(uid){
   if(!log){log={date:tk(),type:-1,dmg:0,xp:0,completed:false,secondaryDone:{}};logs[uid].push(log);}
   var dmg=0,completed=false,msg='',xpBonus=0;
   var canKill=(doneCount>=4)||(total>0&&doneCount===total);
-  if(canKill){dmg=10;completed=true;xpBonus=5;msg='怪物被打死了！今日獎勵解鎖！';}
-  else if(doneCount>=3){dmg=5;completed=false;xpBonus=2;msg='打掉一半血量！明天繼續加油！';}
-  else{dmg=2;completed=false;xpBonus=0;msg='輕微傷害...再努力一點！';}
+  if(canKill){dmg=10;completed=true;msg='怪物被打死了！今日獎勵解鎖！';}
+  else if(doneCount>=3){dmg=5;completed=false;msg='打掉一半血量！明天繼續加油！';}
+  else{dmg=2;completed=false;msg='輕微傷害...再努力一點！';}
   log.dmg=(log.dmg||0)+dmg;
-  log.xp=(log.xp||0)+xpBonus;
   log.completed=completed;
   log.type=canKill?0:doneCount>=3?1:2;
   save();
